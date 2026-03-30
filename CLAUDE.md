@@ -39,7 +39,7 @@ mix format                        # Format code (uses Styler plugin)
 
 ## Architecture
 
-Ten composable modules across three layers:
+Thirteen composable modules across four layers:
 
 **Infrastructure (GenServer + ETS):**
 - **`ApiToolkit.Cache`** - GenServer wrapping a named ETS table with TTL. Periodic cleanup via `Process.send_after`. Public ETS reads bypass the GenServer for concurrency.
@@ -57,7 +57,12 @@ Ten composable modules across three layers:
 - **`ApiToolkit.Provider`** - Behaviour + macro module. `use ApiToolkit.Provider` + `defapi/2` accumulates endpoint metadata at compile time via `@before_compile`. Generates `provider_info/0`, `endpoints/0`, `describe/1`, and `indicators/0`. TTL is runtime-configurable via `{PROVIDER_NAME}_CACHE_TTL_MS` env var.
 - **`ApiToolkit.Discovery`** - Macro-only module. `use ApiToolkit.Discovery, providers: [...]` generates 8 discovery functions (providers, all_endpoints, describe, help, search, by_provider, categories, by_category) by calling into Provider callbacks at runtime.
 
-**Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface. Plug modules compose in a pipeline: RemoteIp → RateLimit → Router dispatch via Helpers.
+**MCP Server (JSON-RPC 2.0):**
+- **`ApiToolkit.MCP.Server`** - Behaviour defining the contract for MCP handlers. Required callbacks: `tools/0` (tool definitions with name, description, inputSchema, callback) and `server_info/0`. Optional callbacks for resources, prompts, and custom capabilities (extensibility for T2/T3/T4).
+- **`ApiToolkit.MCP.Handler`** - Pure-function JSON-RPC 2.0 dispatch. Takes decoded message map + handler module, returns response tuple. Handles: `initialize` (version negotiation, protocol `2025-03-26`), `ping`, `tools/list`, `tools/call` (with exception catching → `isError: true`), `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, and notifications. Full batch support via `handle_batch/3`. Transport-agnostic.
+- **`ApiToolkit.MCP.Plug`** - HTTP transport layer. `@behaviour Plug` that reads parsed JSON body (single or batch array), delegates to Handler, sends 200/202/400 responses. POST-only (405 for other methods). Configurable: `:handler` (required), `:assigns` (optional context for arity-2 tool callbacks).
+
+**Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface. Plug modules compose in a pipeline: RemoteIp → RateLimit → Router dispatch via Helpers. MCP Server exposes tools via JSON-RPC — consumers implement the `MCP.Server` behaviour and forward `/mcp` to `MCP.Plug`.
 
 **Self-describing API (Descripex)**: The 4 infrastructure modules (Cache, RateLimiter, InboundLimiter, Metrics) use `api()` macro annotations for machine-readable introspection. The root `ApiToolkit` module uses `Descripex.Discoverable` for progressive disclosure: `ApiToolkit.describe/0` (overview), `describe/1` (module functions), `describe/2` (function detail).
 
@@ -67,6 +72,7 @@ Test support modules live in `test/support/` (compiled only in `:test` via `elix
 - `TestProvider` - Sample provider with two endpoints (search, detail)
 - `OtherTestProvider` - Second provider for multi-provider Discovery tests
 - `TestDiscovery` - Discovery module aggregating both test providers
+- `TestMCPHandler` - MCP handler with four tools (echo, greet, crash, bad_return) for protocol tests
 
 ## Quality Gates
 

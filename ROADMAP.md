@@ -13,6 +13,7 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 ### ✅ Recently Completed
 | Task | Description | Notes |
 |------|-------------|-------|
+| T1 | MCP JSON-RPC server | Behaviour + Handler + Plug, protocol 2025-03-26. Fixed: `_json` batch unwrapping, batched `initialize` rejection, empty body parse error, version negotiation per spec, capability/operation callback alignment, `Code.ensure_loaded` for handler modules |
 | T7 | Proxy-aware remote IP plug | Configurable header, IPv4+IPv6 |
 | T5 | Rejection tracking | Dynamic types, named instances |
 | T6 | Rate limit plug | Configurable limiter, skip paths, optional rejections |
@@ -41,9 +42,7 @@ Expose API endpoints as MCP tools so AI agents (Claude Code, Cursor, Windsurf) c
 
 **Source references:** MPP library at `../mpp/` — `MPP.Plug`, `MPP.Challenge`, `MPP.Credential`, `MPP.Receipt`, `MPP.Method` behaviour. No MCP implementation exists yet in either project — T1/T2/T4 are net-new.
 
-- ⬜ **T1: MCP JSON-RPC server** [D:4/B:8/U:9 → Eff:2.13] 🎯
-      Reusable MCP server module handling the full JSON-RPC 2.0 protocol surface: `initialize` (with version negotiation), `tools/list`, `tools/call` (with safe exception catching), `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, `ping`, notifications (`initialized`, `cancelled`). HTTP transport via Plug router. Follows Tidewave's proven pattern but generic — consumers register tools via callback module, not hardcoded. Uses Elixir built-in `JSON` module (not Jason). Protocol version: `2025-03-26`.
-      📂 No existing implementation — reference Tidewave's MCP server for pattern.
+- ✅ **T1: MCP JSON-RPC server** [D:4/B:8/U:9 → Eff:2.13] 🎯
 
 - ⬜ **T2: Tool registration DSL** [D:3/B:7/U:8 → Eff:2.5] 🎯
       Provide a `use ApiToolkit.MCP` macro or behaviour for registering MCP tools from Provider/Discovery metadata. Auto-converts `defapi` endpoint declarations into MCP tool definitions (name, description, inputSchema). Tool naming convention configurable (path-based default: `/api/hex/encode` → `hex_encode`). Dispatch map linking tool names to `{module, function, tier}` tuples.

@@ -4,7 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP.Plug**: Handle `Plug.Parsers` wrapping of top-level JSON arrays as `%{"_json" => [...]}`. Previously, batch requests sent through a standard `Plug.Parsers` pipeline were routed as invalid single messages instead of being dispatched to `handle_batch/3`.
+
+- **MCP.Plug**: Empty parsed JSON body (`"{}"`) now correctly returns -32600 (Invalid Request) instead of -32700 (Parse error). Previously, `body_params == %{}` fell through to raw body read, which failed because `Plug.Parsers` had already consumed the body stream.
+
+- **MCP.Handler**: Version negotiation now follows MCP 2025-03-26 lifecycle spec. Server always responds with its supported `protocolVersion` — the client decides compatibility. Previously hard-rejected older versions with -32600.
+
+- **MCP.Handler**: Capability advertisement now requires both listing AND operation callbacks. `resources` capability requires `resources/0` + `read_resource/1`; `prompts` requires `prompts/0` + `get_prompt/2`. Previously advertised capabilities based on listing callback alone.
+
+- **MCP.Handler**: All `function_exported?` checks now use `Code.ensure_loaded/1` first, ensuring handler modules work regardless of BEAM loading order.
+
+- **MCP.Handler**: Reject `initialize` requests inside JSON-RPC batches per MCP 2025-03-26 lifecycle spec. The `initialize` handshake must be a standalone request, not part of a batch.
+
 ### Added
+
+- **Phase 3: MCP Server Framework** — Reusable MCP JSON-RPC 2.0 server infrastructure. Three modules:
+
+  - **ApiToolkit.MCP.Server** — Behaviour defining the handler contract. Required callbacks: `tools/0` (tool definitions with name, description, inputSchema, callback) and `server_info/0`. Optional callbacks for resources, prompts, and custom capabilities — extensibility seams for T2 (tool registration DSL), T3 (MPP payment layer), and T4 (resource/prompt registration).
+
+  - **ApiToolkit.MCP.Handler** — Pure-function JSON-RPC 2.0 dispatch. Handles all MCP protocol methods: `initialize` (version negotiation, protocol `2025-03-26`), `ping`, `tools/list`, `tools/call` (with exception catching → `isError: true`), `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, and notifications (`initialized`, `cancelled`). Full JSON-RPC batch support (`handle_batch/3`). Transport-agnostic — no Plug dependency. Tool callbacks support arity 1 (stateless) and arity 2 (with assigns context). Robust input handling: non-map params coerced safely, unexpected tool return values caught with `isError`.
+
+  - **ApiToolkit.MCP.Plug** — HTTP transport layer. POST-only Plug that reads parsed JSON body (single or batch array), delegates to Handler, and sends 200/202/400 responses. Consumers configure with `:handler` (required) and `:assigns` (optional context for arity-2 callbacks). Handles oversized bodies gracefully.
 
 - **Descripex integration** - Added `api()` macro annotations to Cache, RateLimiter, InboundLimiter, and Metrics for machine-readable introspection (`__api__/0`, `__api__/1`). Root `ApiToolkit` module uses `Descripex.Discoverable` for progressive disclosure via `describe/0-2`.
 
