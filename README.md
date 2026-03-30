@@ -64,23 +64,36 @@ children = [
   ApiToolkit.Metrics,
   {ApiToolkit.RateLimiter, name: MyApp.RateLimiter.Brave, rate: {1, :second}},
   {ApiToolkit.RateLimiter, name: MyApp.RateLimiter.Weather, rate: {25, :day}},
-  {ApiToolkit.InboundLimiter, name: MyApp.IPLimiter, limit: {100, :minute}}
+  {ApiToolkit.InboundLimiter, name: MyApp.IPLimiter, limit: {100, :minute}},
+  ApiToolkit.Rejections
 ]
 ```
 
-### Protect Endpoints with Inbound Rate Limiting
+### Plug Pipeline
 
 ```elixir
-case ApiToolkit.InboundLimiter.check(MyApp.IPLimiter, client_ip) do
-  :ok -> handle_request(conn)
-  {:rate_limited, retry_after_ms} ->
-    conn
-    |> put_resp_header("retry-after", to_string(div(retry_after_ms, 1000)))
-    |> send_resp(429, "Too Many Requests")
+defmodule MyApp.Router do
+  use Plug.Router
+
+  # Rewrite conn.remote_ip from proxy header (Fly.io, Cloudflare, Nginx)
+  plug ApiToolkit.Plug.RemoteIp
+  # or: plug ApiToolkit.Plug.RemoteIp, header: "cf-connecting-ip"
+
+  # Per-IP rate limiting with 429 + Retry-After
+  plug ApiToolkit.Plug.RateLimit,
+    limiter: MyApp.IPLimiter,
+    rejections: ApiToolkit.Rejections
+
+  plug :match
+  plug :dispatch
+
+  get "/api/search" do
+    ApiToolkit.Router.Helpers.handle_endpoint(conn, MyApp.Search, :search)
+  end
 end
 ```
 
-Uses a sliding window approximation (same algorithm as Cloudflare/Nginx) to prevent burst-at-boundary issues. The `check/2` call is a direct ETS operation with no GenServer overhead.
+`Plug.RemoteIp` ensures downstream rate limiting sees the real client IP. `Plug.RateLimit` wraps `InboundLimiter` with proper HTTP 429 responses. `Router.Helpers` dispatches to endpoint functions with JSON responses and optional metrics.
 
 ### Runtime Configuration
 
@@ -100,8 +113,12 @@ The env var name is derived from the last segment of the provider module name, u
 | `ApiToolkit.RateLimiter` | Token bucket rate limiter for outbound throttling |
 | `ApiToolkit.InboundLimiter` | Per-key rate limiter with sliding window for inbound protection |
 | `ApiToolkit.Metrics` | Concurrent request metrics (counts, hit rates, durations) |
+| `ApiToolkit.Rejections` | ETS-backed rejection counter by type and path |
 | `ApiToolkit.Provider` | Behaviour + `defapi` macro for defining API providers |
 | `ApiToolkit.Discovery` | Macro generating discovery functions across providers |
+| `ApiToolkit.Plug.RemoteIp` | Rewrites `conn.remote_ip` from proxy header |
+| `ApiToolkit.Plug.RateLimit` | Per-IP rate limiting plug with 429 + Retry-After |
+| `ApiToolkit.Router.Helpers` | Endpoint dispatch with JSON responses and metrics |
 
 ## Documentation
 

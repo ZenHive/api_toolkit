@@ -39,16 +39,25 @@ mix format                        # Format code (uses Styler plugin)
 
 ## Architecture
 
-Six composable modules, no runtime dependencies between them:
+Ten composable modules across three layers:
 
+**Infrastructure (GenServer + ETS):**
 - **`ApiToolkit.Cache`** - GenServer wrapping a named ETS table with TTL. Periodic cleanup via `Process.send_after`. Public ETS reads bypass the GenServer for concurrency.
 - **`ApiToolkit.RateLimiter`** - Token bucket GenServer for outbound throttling. Multiple named instances via `child_spec/1` with `:name` as child id. Callers block via `:queue` when tokens exhausted; served FIFO on refill.
 - **`ApiToolkit.InboundLimiter`** - Per-key inbound rate limiter using ETS with sliding window approximation. `check/2` is a direct ETS operation (no GenServer call). GenServer only handles periodic cleanup of stale entries. Config stored in `:persistent_term` for zero-cost hot path reads. Per-node only; see moduledoc for multi-node deployment notes.
 - **`ApiToolkit.Metrics`** - GenServer owning a `write_concurrency: true` ETS table. Atomic counter updates via `ets:update_counter` — no GenServer bottleneck on writes.
+- **`ApiToolkit.Rejections`** - ETS-backed GenServer tracking rejection counts by type and path. Accepts any atom as rejection type. Named instances via `child_spec/1`. Same atomic-write pattern as Metrics.
+
+**Plug Pipeline:**
+- **`ApiToolkit.Plug.RemoteIp`** - Rewrites `conn.remote_ip` from a trusted reverse proxy header. Configurable header name (default: `fly-client-ip`). IPv4 + IPv6. No-op on missing/invalid header.
+- **`ApiToolkit.Plug.RateLimit`** - Per-IP rate limiting wrapping `InboundLimiter`. Returns 429 + `Retry-After` + JSON body. Configurable: limiter name, skip paths, optional rejection recording.
+- **`ApiToolkit.Router.Helpers`** - `handle_endpoint/3,4` dispatches to `module.function(params)` with JSON response + optional metrics. `merge_params/1` merges query + body params.
+
+**Provider/Discovery DSL:**
 - **`ApiToolkit.Provider`** - Behaviour + macro module. `use ApiToolkit.Provider` + `defapi/2` accumulates endpoint metadata at compile time via `@before_compile`. Generates `provider_info/0`, `endpoints/0`, `describe/1`, and `indicators/0`. TTL is runtime-configurable via `{PROVIDER_NAME}_CACHE_TTL_MS` env var.
 - **`ApiToolkit.Discovery`** - Macro-only module. `use ApiToolkit.Discovery, providers: [...]` generates 8 discovery functions (providers, all_endpoints, describe, help, search, by_provider, categories, by_category) by calling into Provider callbacks at runtime.
 
-**Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface.
+**Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface. Plug modules compose in a pipeline: RemoteIp → RateLimit → Router dispatch via Helpers.
 
 **Self-describing API (Descripex)**: The 4 infrastructure modules (Cache, RateLimiter, InboundLimiter, Metrics) use `api()` macro annotations for machine-readable introspection. The root `ApiToolkit` module uses `Descripex.Discoverable` for progressive disclosure: `ApiToolkit.describe/0` (overview), `describe/1` (module functions), `describe/2` (function detail).
 
