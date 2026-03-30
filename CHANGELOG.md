@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **ApiToolkit.MCP** — `use ApiToolkit.MCP` macro generates a complete `MCP.Server` implementation from Discovery metadata. Zero-boilerplate: provide `:discovery` module and `:server_info`, get `tools/0`, `server_info/0`, and `dispatch_map/0` for free.
+
+- **ApiToolkit.MCP.ToolBuilder** — Pure-function module converting Provider/Discovery endpoints into MCP tool definitions. Path-based tool naming (`/api/hex/encode` → `hex_encode`), JSON Schema generation from Provider params, result translation (strips cache TTL, maps Provider errors to MCP format). Dispatch map links tool names to `{module, function, tier}` tuples — extensibility seam for T3 payment layer.
+
 ### Fixed
 
 - **MCP.Plug**: Handle `Plug.Parsers` wrapping of top-level JSON arrays as `%{"_json" => [...]}`. Previously, batch requests sent through a standard `Plug.Parsers` pipeline were routed as invalid single messages instead of being dispatched to `handle_batch/3`.

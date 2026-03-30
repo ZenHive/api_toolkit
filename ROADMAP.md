@@ -13,6 +13,7 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 ### ✅ Recently Completed
 | Task | Description | Notes |
 |------|-------------|-------|
+| T2 | Tool registration DSL | `use ApiToolkit.MCP` macro + `ToolBuilder` pure functions. Auto-converts `defapi` endpoints → MCP tools. Path-based naming, dispatch map for T3 |
 | T1 | MCP JSON-RPC server | Behaviour + Handler + Plug, protocol 2025-03-26. Fixed: `_json` batch unwrapping, batched `initialize` rejection, empty body parse error, version negotiation per spec, capability/operation callback alignment, `Code.ensure_loaded` for handler modules |
 | T7 | Proxy-aware remote IP plug | Configurable header, IPv4+IPv6 |
 | T5 | Rejection tracking | Dynamic types, named instances |
@@ -44,8 +45,7 @@ Expose API endpoints as MCP tools so AI agents (Claude Code, Cursor, Windsurf) c
 
 - ✅ **T1: MCP JSON-RPC server** [D:4/B:8/U:9 → Eff:2.13] 🎯
 
-- ⬜ **T2: Tool registration DSL** [D:3/B:7/U:8 → Eff:2.5] 🎯
-      Provide a `use ApiToolkit.MCP` macro or behaviour for registering MCP tools from Provider/Discovery metadata. Auto-converts `defapi` endpoint declarations into MCP tool definitions (name, description, inputSchema). Tool naming convention configurable (path-based default: `/api/hex/encode` → `hex_encode`). Dispatch map linking tool names to `{module, function, tier}` tuples.
+- ✅ **T2: Tool registration DSL** [D:3/B:7/U:8 → Eff:2.5] 🎯
 
 - ⬜ **T3: MPP payment layer for MCP** [D:4/B:7/U:8 → Eff:1.88] 🚀
       Translate MPP's HTTP 402 challenge/credential/receipt flow to MCP JSON-RPC transport per the [MPP MCP transport binding spec](https://mpp.dev/protocol/transports/mcp). Error code `-32042` (Payment Required) with challenges in `error.data.challenges`. Error code `-32043` (Payment Verification Failed). Credentials in `params._meta["org.paymentauth/credential"]`, receipts in `result._meta["org.paymentauth/receipt"]`. Reuses `MPP.Plug.init/1` for config building to guarantee byte-identical HMAC binding. Advertises payment capabilities in `initialize` response under `capabilities.experimental.payment`. Records rejections for metrics integration.

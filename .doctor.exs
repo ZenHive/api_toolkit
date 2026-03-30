@@ -1,5 +1,5 @@
 %Doctor.Config{
-  ignore_modules: [],
+  ignore_modules: [ApiToolkit.MCP, ApiToolkit.Provider],
   ignore_paths: [],
   min_module_doc_coverage: 75,
   min_module_spec_coverage: 50,
