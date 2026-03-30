@@ -14,4 +14,12 @@ defmodule ApiToolkit do
   - `ApiToolkit.Provider` - Behaviour and macros for defining API providers
   - `ApiToolkit.Discovery` - Macro for generating endpoint discovery functions
   """
+
+  use Descripex.Discoverable,
+    modules: [
+      ApiToolkit.Cache,
+      ApiToolkit.RateLimiter,
+      ApiToolkit.InboundLimiter,
+      ApiToolkit.Metrics
+    ]
 end

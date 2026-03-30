@@ -15,6 +15,7 @@ defmodule ApiToolkit.Cache do
       ]
   """
   use GenServer
+  use Descripex, namespace: "/cache"
 
   defstruct [:table]
 
@@ -37,11 +38,13 @@ defmodule ApiToolkit.Cache do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc """
-  Gets a cached value if it exists and hasn't expired.
+  api(:get, "Get a cached value if it exists and hasn't expired.",
+    params: [
+      key: [kind: :value, description: "Cache key"]
+    ],
+    returns: %{type: "{:ok, term()} | :miss", description: "The cached value or :miss if not found/expired"}
+  )
 
-  Returns `{:ok, value}` if found and valid, `:miss` if not found or expired.
-  """
   @spec get(term()) :: {:ok, term()} | :miss
   def get(key) do
     now = System.system_time(:millisecond)
@@ -55,9 +58,15 @@ defmodule ApiToolkit.Cache do
     end
   end
 
-  @doc """
-  Stores a value in the cache with the given TTL in milliseconds.
-  """
+  api(:put, "Store a value in the cache with the given TTL in milliseconds.",
+    params: [
+      key: [kind: :value, description: "Cache key"],
+      value: [kind: :value, description: "Value to cache"],
+      ttl_ms: [kind: :value, description: "Time-to-live in milliseconds"]
+    ],
+    returns: %{type: :ok, description: "Always returns :ok"}
+  )
+
   @spec put(term(), term(), pos_integer()) :: :ok
   def put(key, value, ttl_ms) do
     expires_at = System.system_time(:millisecond) + ttl_ms
@@ -65,22 +74,23 @@ defmodule ApiToolkit.Cache do
     :ok
   end
 
-  @doc """
-  Deletes a specific cache entry by key.
+  api(:delete, "Delete a specific cache entry by key.",
+    params: [
+      key: [kind: :value, description: "Cache key to delete"]
+    ],
+    returns: %{type: :ok, description: "Always returns :ok regardless of whether the key existed"}
+  )
 
-  Returns `:ok` regardless of whether the key existed.
-  """
   @spec delete(term()) :: :ok
   def delete(key) do
     :ets.delete(@table, key)
     :ok
   end
 
-  @doc """
-  Clears all entries from the cache.
+  api(:clear, "Clear all entries from the cache. Returns the number of entries deleted.",
+    returns: %{type: :non_neg_integer, description: "Number of entries that were deleted"}
+  )
 
-  Returns the number of entries that were deleted.
-  """
   @spec clear() :: non_neg_integer()
   def clear do
     count = :ets.info(@table, :size)
@@ -88,17 +98,23 @@ defmodule ApiToolkit.Cache do
     count
   end
 
-  @doc """
-  Lists all cache keys (for debugging/admin purposes).
-  """
+  api(:keys, "List all cache keys (for debugging/admin purposes).",
+    returns: %{type: :list, description: "List of all cache keys"}
+  )
+
   @spec keys() :: [term()]
   def keys do
     :ets.foldl(fn {key, _value, _expires}, acc -> [key | acc] end, [], @table)
   end
 
-  @doc """
-  Returns cache statistics including entry count and memory usage.
-  """
+  api(:stats, "Return cache statistics including entry count and memory usage.",
+    returns: %{
+      type: :map,
+      description: "Map with :entry_count and :memory_bytes keys",
+      schema: %{entry_count: non_neg_integer(), memory_bytes: non_neg_integer()}
+    }
+  )
+
   @spec stats() :: %{entry_count: non_neg_integer(), memory_bytes: non_neg_integer()}
   def stats do
     %{

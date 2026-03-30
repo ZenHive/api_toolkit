@@ -18,6 +18,7 @@ defmodule ApiToolkit.Metrics do
       ApiToolkit.Metrics.record("/my/endpoint", :hit, duration_us)
   """
   use GenServer
+  use Descripex, namespace: "/metrics"
 
   @table __MODULE__
   @precision_digits 3
@@ -32,15 +33,15 @@ defmodule ApiToolkit.Metrics do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc """
-  Records a request metric.
+  api(:record, "Record a request metric for an endpoint.",
+    params: [
+      endpoint: [kind: :value, description: "The endpoint path (e.g., \"/brave/search\")"],
+      cache_status: [kind: :value, description: ":hit or :miss"],
+      duration_us: [kind: :value, description: "Response time in microseconds"]
+    ],
+    returns: %{type: :ok, description: "Always returns :ok"}
+  )
 
-  ## Parameters
-
-  - `endpoint` - The endpoint path (e.g., "/brave/search")
-  - `cache_status` - `:hit` or `:miss`
-  - `duration_us` - Response time in microseconds
-  """
   @spec record(String.t(), :hit | :miss, non_neg_integer()) :: :ok
   def record(endpoint, cache_status, duration_us) do
     now = System.system_time(:second)
@@ -58,9 +59,14 @@ defmodule ApiToolkit.Metrics do
     :ok
   end
 
-  @doc """
-  Returns all metrics as a map.
-  """
+  api(:get_all, "Return all metrics as a map keyed by endpoint path.",
+    returns: %{
+      type: :map,
+      description:
+        "Map of endpoint path to metrics (total_requests, cache_hits, cache_misses, hit_rate, avg_duration_us, last_request_at)"
+    }
+  )
+
   @spec get_all() :: map()
   def get_all do
     (&reduce_raw_metrics/2)
@@ -68,9 +74,14 @@ defmodule ApiToolkit.Metrics do
     |> Map.new(&format_endpoint_metrics/1)
   end
 
-  @doc """
-  Returns a summary of all metrics.
-  """
+  api(:summary, "Return an aggregated summary of all metrics.",
+    returns: %{
+      type: :map,
+      description:
+        "Map with :total_requests, :total_cache_hits, :total_cache_misses, :overall_hit_rate, :endpoints_count, and :by_endpoint"
+    }
+  )
+
   @spec summary() :: map()
   def summary do
     metrics = get_all()
@@ -89,9 +100,8 @@ defmodule ApiToolkit.Metrics do
     }
   end
 
-  @doc """
-  Resets all metrics.
-  """
+  api(:reset, "Reset all metrics.", returns: %{type: :ok, description: "Always returns :ok"})
+
   @spec reset() :: :ok
   def reset do
     :ets.delete_all_objects(@table)

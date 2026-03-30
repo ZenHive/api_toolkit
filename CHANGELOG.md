@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Descripex integration** - Added `api()` macro annotations to Cache, RateLimiter, InboundLimiter, and Metrics for machine-readable introspection (`__api__/0`, `__api__/1`). Root `ApiToolkit` module uses `Descripex.Discoverable` for progressive disclosure via `describe/0-2`.
+
 ## [0.1.0] - 2026-03-30
 
 Initial release. Published to [Hex](https://hex.pm/packages/api_toolkit/0.1.0).

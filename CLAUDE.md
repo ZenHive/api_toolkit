@@ -50,6 +50,8 @@ Six composable modules, no runtime dependencies between them:
 
 **Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface.
 
+**Self-describing API (Descripex)**: The 4 infrastructure modules (Cache, RateLimiter, InboundLimiter, Metrics) use `api()` macro annotations for machine-readable introspection. The root `ApiToolkit` module uses `Descripex.Discoverable` for progressive disclosure: `ApiToolkit.describe/0` (overview), `describe/1` (module functions), `describe/2` (function detail).
+
 ## Test Support
 
 Test support modules live in `test/support/` (compiled only in `:test` via `elixirc_paths`):

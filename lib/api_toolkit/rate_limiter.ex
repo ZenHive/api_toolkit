@@ -18,6 +18,7 @@ defmodule ApiToolkit.RateLimiter do
       ApiToolkit.RateLimiter.acquire(MyApp.RateLimiter.ServiceA)
   """
   use GenServer
+  use Descripex, namespace: "/rate-limiter"
 
   defstruct [:tokens, :max_tokens, :refill_ms, :waiting]
 
@@ -61,20 +62,28 @@ defmodule ApiToolkit.RateLimiter do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  @doc """
-  Acquires a token from the rate limiter.
+  api(:acquire, "Acquire a token from the rate limiter. Blocks until a token is available if the bucket is empty.",
+    params: [
+      server: [kind: :config, description: "The rate limiter name or pid"]
+    ],
+    returns: %{type: :ok, description: "Returns :ok once a token is acquired"}
+  )
 
-  Returns `:ok` immediately if a token is available.
-  Blocks until a token becomes available if the bucket is empty.
-  """
   @spec acquire(GenServer.server()) :: :ok
   def acquire(server) do
     GenServer.call(server, :acquire, :infinity)
   end
 
-  @doc """
-  Returns the current status of the rate limiter without consuming a token.
-  """
+  api(:status, "Return the current status of the rate limiter without consuming a token.",
+    params: [
+      server: [kind: :config, description: "The rate limiter name or pid"]
+    ],
+    returns: %{
+      type: :map,
+      description: "Map with :tokens_available, :max_tokens, and :queue_depth keys"
+    }
+  )
+
   @spec status(GenServer.server()) :: map()
   def status(server) do
     GenServer.call(server, :status)

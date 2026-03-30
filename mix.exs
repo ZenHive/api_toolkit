@@ -34,6 +34,10 @@ defmodule ApiToolkit.MixProject do
 
   defp deps do
     [
+      # Self-describing APIs — full dep (not dev/test only), macros expand at compile time
+      {:descripex, "~> 0.6"},
+
+      # Dev/test tooling
       {:ex_unit_json, ">= 0.4.0", only: [:dev, :test], runtime: false},
       {:dialyzer_json, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:styler, ">= 0.0.0", only: [:dev, :test], runtime: false},

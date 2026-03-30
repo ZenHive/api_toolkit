@@ -63,6 +63,7 @@ defmodule ApiToolkit.InboundLimiter do
   - `:cleanup_interval_ms` - Optional. How often to purge stale entries (default: 60000)
   """
   use GenServer
+  use Descripex, namespace: "/inbound-limiter"
 
   defstruct [:table, :window_size_ms, :cleanup_interval_ms]
 
@@ -111,14 +112,19 @@ defmodule ApiToolkit.InboundLimiter do
     GenServer.start_link(__MODULE__, opts, name: name)
   end
 
-  @doc """
-  Checks if a request for the given key is allowed under the rate limit.
+  api(
+    :check,
+    "Check if a request for the given key is allowed under the rate limit. Direct ETS operation, sub-microsecond latency.",
+    params: [
+      server: [kind: :config, description: "The inbound limiter name"],
+      key: [kind: :value, description: "Client identifier (IP, API key, or any term)"]
+    ],
+    returns: %{
+      type: ":ok | {:rate_limited, pos_integer()}",
+      description: ":ok if allowed, or {:rate_limited, retry_after_ms} if limit exceeded"
+    }
+  )
 
-  Increments the counter and returns `:ok` if within limits,
-  or `{:rate_limited, retry_after_ms}` if the limit is exceeded.
-
-  This is a direct ETS operation — no GenServer call, sub-microsecond latency.
-  """
   @spec check(atom(), key()) :: check_result()
   def check(server, key) do
     {window_size_ms, limit} = :persistent_term.get({server, :config})
@@ -161,11 +167,14 @@ defmodule ApiToolkit.InboundLimiter do
     end
   end
 
-  @doc """
-  Returns the current estimated weighted count for a key without incrementing.
+  api(:status, "Return the current estimated weighted count for a key without incrementing.",
+    params: [
+      server: [kind: :config, description: "The inbound limiter name"],
+      key: [kind: :value, description: "Client identifier to check"]
+    ],
+    returns: %{type: "{:ok, float()} | :not_found", description: "Weighted count or :not_found"}
+  )
 
-  Returns `{:ok, weighted_count}` or `:not_found`.
-  """
   @spec status(atom(), key()) :: {:ok, float()} | :not_found
   def status(server, key) do
     {window_size_ms, _limit} = :persistent_term.get({server, :config})
@@ -186,11 +195,14 @@ defmodule ApiToolkit.InboundLimiter do
     end
   end
 
-  @doc """
-  Resets the counter for a specific key.
+  api(:reset, "Reset the counter for a specific key.",
+    params: [
+      server: [kind: :config, description: "The inbound limiter name"],
+      key: [kind: :value, description: "Client identifier to reset"]
+    ],
+    returns: %{type: :ok, description: "Always returns :ok regardless of whether the key existed"}
+  )
 
-  Returns `:ok` regardless of whether the key existed.
-  """
   @spec reset(atom(), key()) :: :ok
   def reset(server, key) do
     :ets.delete(server, key)
