@@ -6,11 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Resource/prompt registration** — `use ApiToolkit.MCP` now accepts optional `:resources` and `:prompts` options for declarative MCP resource and prompt registration. Resources declare a `:read` function called at runtime; prompts declare a `:handler` function receiving arguments. The macro generates `resources/0`, `read_resource/1`, `prompts/0`, and `get_prompt/2` callbacks. Handler capability advertisement correctly gates on both listing AND operation callbacks being present.
+
 - **ApiToolkit.MCP** — `use ApiToolkit.MCP` macro generates a complete `MCP.Server` implementation from Discovery metadata. Zero-boilerplate: provide `:discovery` module and `:server_info`, get `tools/0`, `server_info/0`, and `dispatch_map/0` for free.
 
 - **ApiToolkit.MCP.ToolBuilder** — Pure-function module converting Provider/Discovery endpoints into MCP tool definitions. Path-based tool naming (`/api/hex/encode` → `hex_encode`), JSON Schema generation from Provider params, result translation (strips cache TTL, maps Provider errors to MCP format). Dispatch map links tool names to `{module, function, tier}` tuples — extensibility seam for T3 payment layer.
 
 ### Fixed
+
+- **MCP.Handler**: Exception safety for `resources/read` and `prompts/get`. Raising `:read` or `:handler` functions now produce MCP error responses instead of crashing the process. Matches existing `tools/call` exception-catching behavior.
 
 - **MCP.Plug**: Handle `Plug.Parsers` wrapping of top-level JSON arrays as `%{"_json" => [...]}`. Previously, batch requests sent through a standard `Plug.Parsers` pipeline were routed as invalid single messages instead of being dispatched to `handle_batch/3`.
 

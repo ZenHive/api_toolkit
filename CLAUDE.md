@@ -58,10 +58,10 @@ Fifteen composable modules across four layers:
 - **`ApiToolkit.Discovery`** - Macro-only module. `use ApiToolkit.Discovery, providers: [...]` generates 8 discovery functions (providers, all_endpoints, describe, help, search, by_provider, categories, by_category) by calling into Provider callbacks at runtime.
 
 **MCP Server (JSON-RPC 2.0):**
-- **`ApiToolkit.MCP.Server`** - Behaviour defining the contract for MCP handlers. Required callbacks: `tools/0` (tool definitions with name, description, inputSchema, callback) and `server_info/0`. Optional callbacks for resources, prompts, and custom capabilities (extensibility for T3/T4).
+- **`ApiToolkit.MCP.Server`** - Behaviour defining the contract for MCP handlers. Required callbacks: `tools/0` (tool definitions with name, description, inputSchema, callback) and `server_info/0`. Optional callbacks for resources, prompts, and custom capabilities (extensibility for T3).
 - **`ApiToolkit.MCP.Handler`** - Pure-function JSON-RPC 2.0 dispatch. Takes decoded message map + handler module, returns response tuple. Handles: `initialize` (version negotiation, protocol `2025-03-26`), `ping`, `tools/list`, `tools/call` (with exception catching → `isError: true`), `resources/list`, `resources/read`, `prompts/list`, `prompts/get`, and notifications. Full batch support via `handle_batch/3`. Transport-agnostic.
 - **`ApiToolkit.MCP.Plug`** - HTTP transport layer. `@behaviour Plug` that reads parsed JSON body (single or batch array), delegates to Handler, sends 200/202/400 responses. POST-only (405 for other methods). Configurable: `:handler` (required), `:assigns` (optional context for arity-2 tool callbacks).
-- **`ApiToolkit.MCP`** - `use ApiToolkit.MCP` macro generates a complete `MCP.Server` implementation from a Discovery module. Options: `:discovery`, `:server_info`, `:strip_prefixes`, `:tool_name`, `:tiers`. Generates `tools/0`, `server_info/0`, and `dispatch_map/0`.
+- **`ApiToolkit.MCP`** - `use ApiToolkit.MCP` macro generates a complete `MCP.Server` implementation from a Discovery module. Options: `:discovery`, `:server_info`, `:strip_prefixes`, `:tool_name`, `:tiers`, `:resources`, `:prompts`. Generates `tools/0`, `server_info/0`, `dispatch_map/0`, and optionally `resources/0`, `read_resource/1`, `prompts/0`, `get_prompt/2`. Resources declare a `:read` function; prompts declare a `:handler` function. Private helper functions (`__mcp_resources__/0`, `__mcp_prompts__/0`) hold the raw definitions with anonymous functions at runtime.
 - **`ApiToolkit.MCP.ToolBuilder`** - Pure-function module converting Provider/Discovery endpoints into MCP tool definitions. Path-based naming (`/api/hex/encode` → `hex_encode`), JSON Schema generation from Provider params, Provider→MCP result translation (strips cache TTL, maps errors). `dispatch_map/2` returns `%{tool_name => {module, function, tier}}` for T3 payment layer.
 
 **Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface. Plug modules compose in a pipeline: RemoteIp → RateLimit → Router dispatch via Helpers. MCP Server exposes tools via JSON-RPC — consumers implement the `MCP.Server` behaviour and forward `/mcp` to `MCP.Plug`.
@@ -74,8 +74,24 @@ Test support modules live in `test/support/` (compiled only in `:test` via `elix
 - `TestProvider` - Sample provider with two endpoints (search, detail)
 - `OtherTestProvider` - Second provider for multi-provider Discovery tests
 - `TestDiscovery` - Discovery module aggregating both test providers
-- `TestMCPHandler` - MCP handler with four tools (echo, greet, crash, bad_return) for protocol tests
+- `TestMCPHandler` - MCP handler with six tools (echo, greet, crash, bad_return, structured, with_meta) for protocol tests. Also defines `TestMCPHandlerResourcesOnly` and `TestMCPHandlerPromptsOnly` for capability gating tests
+- `TestMCPHandlerFull` - MCP handler implementing all optional callbacks (resources, read_resource, prompts, get_prompt) for success path tests
 - `TestMCPToolsHandler` - MCP handler generated via `use ApiToolkit.MCP` from TestDiscovery for tool registration DSL tests
+- `TestMCPResourcesPromptsHandler` - MCP handler generated via `use ApiToolkit.MCP` with `:resources` and `:prompts` options for macro registration tests
+
+## Git Commit Configuration
+
+**Configured**: 2026-03-30
+
+### Commit Message Format
+
+**Format**: imperative-mood
+
+#### Imperative Mood Template
+```
+<description>
+```
+Start with imperative verb: Add, Update, Fix, Remove, etc.
 
 ## Quality Gates
 

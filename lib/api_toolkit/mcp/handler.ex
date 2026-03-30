@@ -226,6 +226,23 @@ defmodule ApiToolkit.MCP.Handler do
   defp call_tool(callback, args, assigns) when is_function(callback, 2), do: callback.(args, assigns)
   defp call_tool(callback, args, _assigns) when is_function(callback, 1), do: callback.(args)
 
+  # Exception-safe wrappers for resource/prompt callbacks (same pattern as safe_call_tool)
+  defp safe_read_resource(handler, uri) do
+    handler.read_resource(uri)
+  catch
+    kind, reason ->
+      message = Exception.format(kind, reason, __STACKTRACE__)
+      {:error, "Failed to read resource: #{message}"}
+  end
+
+  defp safe_get_prompt(handler, name, args) do
+    handler.get_prompt(name, args)
+  catch
+    kind, reason ->
+      message = Exception.format(kind, reason, __STACKTRACE__)
+      {:error, "Failed to get prompt: #{message}"}
+  end
+
   # Tool result formatting
 
   defp format_tool_result({:ok, text}) when is_binary(text) do
@@ -267,7 +284,7 @@ defmodule ApiToolkit.MCP.Handler do
 
   defp handle_resources_read(id, %{"uri" => uri}, handler) do
     if exports?(handler, :read_resource, 1) do
-      case handler.read_resource(uri) do
+      case safe_read_resource(handler, uri) do
         {:ok, content} ->
           {:reply, 200, wrap_result(id, %{contents: [%{uri: uri, text: content}]})}
 
@@ -300,7 +317,7 @@ defmodule ApiToolkit.MCP.Handler do
     if exports?(handler, :get_prompt, 2) do
       args = Map.get(params, "arguments", %{})
 
-      case handler.get_prompt(name, args) do
+      case safe_get_prompt(handler, name, args) do
         {:ok, text} ->
           {:reply, 200, wrap_result(id, %{messages: [%{role: "user", content: %{type: "text", text: text}}]})}
 

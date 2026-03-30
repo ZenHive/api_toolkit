@@ -364,6 +364,124 @@ defmodule ApiToolkit.MCP.ToolBuilderTest do
     end
   end
 
+  describe "use ApiToolkit.MCP with :resources and :prompts" do
+    @rp_handler ApiToolkit.TestMCPResourcesPromptsHandler
+
+    test "generated handler exports resource and prompt callbacks" do
+      Code.ensure_loaded!(@rp_handler)
+
+      assert function_exported?(@rp_handler, :resources, 0)
+      assert function_exported?(@rp_handler, :read_resource, 1)
+      assert function_exported?(@rp_handler, :prompts, 0)
+      assert function_exported?(@rp_handler, :get_prompt, 2)
+    end
+
+    test "resources/0 returns metadata without :read key" do
+      resources = @rp_handler.resources()
+
+      assert length(resources) == 2
+      uris = Enum.map(resources, & &1.uri)
+      assert "api:///spec.json" in uris
+      assert "api:///help.txt" in uris
+
+      for res <- resources do
+        refute Map.has_key?(res, :read), "resources/0 should strip :read key"
+        assert Map.has_key?(res, :name)
+      end
+    end
+
+    test "read_resource/1 returns content for valid URI" do
+      assert {:ok, text} = @rp_handler.read_resource("api:///spec.json")
+      assert text =~ "1.0"
+    end
+
+    test "read_resource/1 returns error for unknown URI" do
+      assert {:error, "Resource not found"} = @rp_handler.read_resource("api:///unknown")
+    end
+
+    test "prompts/0 returns metadata without :handler key" do
+      prompts = @rp_handler.prompts()
+
+      assert length(prompts) == 2
+      names = Enum.map(prompts, & &1.name)
+      assert "search_guide" in names
+      assert "welcome" in names
+
+      for p <- prompts do
+        refute Map.has_key?(p, :handler), "prompts/0 should strip :handler key"
+      end
+    end
+
+    test "get_prompt/2 returns ok for valid prompt with arguments" do
+      assert {:ok, text} = @rp_handler.get_prompt("search_guide", %{"topic" => "hex"})
+      assert text =~ "hex"
+    end
+
+    test "get_prompt/2 returns error for missing required argument" do
+      assert {:error, msg} = @rp_handler.get_prompt("search_guide", %{})
+      assert msg =~ "topic"
+    end
+
+    test "get_prompt/2 returns ok for no-argument prompt" do
+      assert {:ok, text} = @rp_handler.get_prompt("welcome", %{})
+      assert text =~ "Welcome"
+    end
+
+    test "get_prompt/2 returns error for unknown prompt" do
+      assert {:error, "Prompt not found"} = @rp_handler.get_prompt("nonexistent", %{})
+    end
+
+    test "initialize advertises resources and prompts capabilities" do
+      message = %{
+        "jsonrpc" => "2.0",
+        "id" => "init",
+        "method" => "initialize",
+        "params" => %{"protocolVersion" => "2025-03-26"}
+      }
+
+      {:reply, 200, response} = Handler.handle(message, @rp_handler)
+
+      assert %{resources: %{listChanged: false}} = response.result.capabilities
+      assert %{prompts: %{listChanged: false}} = response.result.capabilities
+    end
+
+    test "resources/read works end-to-end through MCP Handler" do
+      message = %{
+        "jsonrpc" => "2.0",
+        "id" => "1",
+        "method" => "resources/read",
+        "params" => %{"uri" => "api:///help.txt"}
+      }
+
+      {:reply, 200, response} = Handler.handle(message, @rp_handler)
+
+      [content] = response.result.contents
+      assert content.uri == "api:///help.txt"
+      assert content.text =~ "search tool"
+    end
+
+    test "prompts/get works end-to-end through MCP Handler" do
+      message = %{
+        "jsonrpc" => "2.0",
+        "id" => "1",
+        "method" => "prompts/get",
+        "params" => %{"name" => "welcome"}
+      }
+
+      {:reply, 200, response} = Handler.handle(message, @rp_handler)
+
+      [msg] = response.result.messages
+      assert msg.role == "user"
+      assert msg.content.text =~ "Welcome"
+    end
+
+    test "tools still work alongside resources and prompts" do
+      tools = @rp_handler.tools()
+      assert length(tools) == 3
+      assert Enum.any?(tools, &(&1.name == "search"))
+    end
+  end
+
   describe "use ApiToolkit.MCP with :tool_name option" do
     test "macro-generated tools use custom naming function" do
       tools = ApiToolkit.TestMCPCustomNameHandler.tools()

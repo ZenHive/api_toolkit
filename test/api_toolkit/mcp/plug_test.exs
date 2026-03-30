@@ -212,6 +212,55 @@ defmodule ApiToolkit.MCP.PlugTest do
     end
   end
 
+  describe "resources and prompts through Plug" do
+    @full_opts MCP.Plug.init(handler: ApiToolkit.TestMCPHandlerFull)
+
+    test "resources/list returns 200 with resources array" do
+      conn = post_json(%{jsonrpc: "2.0", method: "resources/list", id: 1}, @full_opts)
+
+      assert conn.status == 200
+      body = json_body(conn)
+      resources = body["result"]["resources"]
+      assert length(resources) == 2
+      assert Enum.any?(resources, &(&1["uri"] == "api:///openapi.json"))
+    end
+
+    test "resources/read returns 200 with contents" do
+      conn =
+        post_json(%{jsonrpc: "2.0", method: "resources/read", id: 1, params: %{uri: "api:///openapi.json"}}, @full_opts)
+
+      assert conn.status == 200
+      body = json_body(conn)
+      [content] = body["result"]["contents"]
+      assert content["uri"] == "api:///openapi.json"
+      assert content["text"] =~ "3.1.0"
+    end
+
+    test "prompts/list returns 200 with prompts array" do
+      conn = post_json(%{jsonrpc: "2.0", method: "prompts/list", id: 1}, @full_opts)
+
+      assert conn.status == 200
+      body = json_body(conn)
+      prompts = body["result"]["prompts"]
+      assert length(prompts) == 2
+      assert Enum.any?(prompts, &(&1["name"] == "search_help"))
+    end
+
+    test "prompts/get returns 200 with messages" do
+      conn =
+        post_json(
+          %{jsonrpc: "2.0", method: "prompts/get", id: 1, params: %{name: "greeting"}},
+          @full_opts
+        )
+
+      assert conn.status == 200
+      body = json_body(conn)
+      [message] = body["result"]["messages"]
+      assert message["role"] == "user"
+      assert message["content"]["text"] =~ "Hello"
+    end
+  end
+
   describe "connection state" do
     test "all responses halt the connection" do
       conn = post_json(%{jsonrpc: "2.0", method: "ping", id: 1})

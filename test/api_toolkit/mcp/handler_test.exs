@@ -267,6 +267,192 @@ defmodule ApiToolkit.MCP.HandlerTest do
     end
   end
 
+  # --- Full handler tests (TestMCPHandlerFull) ---
+  # Verifies success paths for resources/read and prompts/get.
+
+  @full_handler ApiToolkit.TestMCPHandlerFull
+
+  describe "initialize with full handler" do
+    test "advertises resources capability when both callbacks exist" do
+      msg = request("initialize", 1, %{"protocolVersion" => "2025-03-26"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert %{resources: %{listChanged: false}} = response.result.capabilities
+    end
+
+    test "advertises prompts capability when both callbacks exist" do
+      msg = request("initialize", 1, %{"protocolVersion" => "2025-03-26"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert %{prompts: %{listChanged: false}} = response.result.capabilities
+    end
+  end
+
+  describe "resources/list with full handler" do
+    test "returns all resources" do
+      msg = request("resources/list", 1)
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      resources = response.result.resources
+      assert length(resources) == 2
+
+      uris = Enum.map(resources, & &1.uri)
+      assert "api:///openapi.json" in uris
+      assert "api:///readme" in uris
+    end
+  end
+
+  describe "resources/read with full handler" do
+    test "returns content for valid URI" do
+      msg = request("resources/read", 1, %{"uri" => "api:///openapi.json"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert [%{uri: "api:///openapi.json", text: text}] = response.result.contents
+      assert text =~ "3.1.0"
+    end
+
+    test "returns different content for different URI" do
+      msg = request("resources/read", 1, %{"uri" => "api:///readme"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert [%{uri: "api:///readme", text: text}] = response.result.contents
+      assert text =~ "ApiToolkit"
+    end
+
+    test "returns error for unknown URI" do
+      msg = request("resources/read", 1, %{"uri" => "api:///nonexistent"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "not found"
+    end
+
+    test "returns error when uri parameter missing" do
+      msg = request("resources/read", 1, %{})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "uri"
+    end
+  end
+
+  describe "prompts/list with full handler" do
+    test "returns all prompts" do
+      msg = request("prompts/list", 1)
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      prompts = response.result.prompts
+      assert length(prompts) == 2
+
+      names = Enum.map(prompts, & &1.name)
+      assert "search_help" in names
+      assert "greeting" in names
+    end
+  end
+
+  describe "prompts/get with full handler" do
+    test "returns message for prompt with arguments" do
+      msg = request("prompts/get", 1, %{"name" => "search_help", "arguments" => %{"topic" => "hex"}})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert [%{role: "user", content: %{type: "text", text: text}}] = response.result.messages
+      assert text =~ "hex"
+      assert text =~ "search"
+    end
+
+    test "returns error when required argument missing" do
+      msg = request("prompts/get", 1, %{"name" => "search_help", "arguments" => %{}})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "topic"
+    end
+
+    test "returns message for no-argument prompt" do
+      msg = request("prompts/get", 1, %{"name" => "greeting"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert [%{role: "user", content: %{type: "text", text: text}}] = response.result.messages
+      assert text =~ "Hello"
+    end
+
+    test "returns error for unknown prompt" do
+      msg = request("prompts/get", 1, %{"name" => "nonexistent"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "not found"
+    end
+
+    test "returns error when name parameter missing" do
+      msg = request("prompts/get", 1, %{})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "name"
+    end
+
+    test "defaults arguments to empty map when omitted" do
+      msg = request("prompts/get", 1, %{"name" => "greeting"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, @full_handler)
+      assert is_list(response.result.messages)
+    end
+  end
+
+  # --- Exception safety tests ---
+  # Verifies that raising :read / :handler functions produce MCP error responses
+  # instead of crashing the process (matching tools/call behavior).
+
+  defmodule RaisingMCPHandler do
+    @moduledoc false
+    @behaviour ApiToolkit.MCP.Server
+
+    @impl true
+    def server_info, do: %{name: "raising-handler", version: "0.1.0"}
+
+    @impl true
+    def tools, do: []
+
+    @impl true
+    def resources do
+      [%{uri: "api:///boom", name: "boom", description: "Raises", mimeType: "text/plain"}]
+    end
+
+    @impl true
+    def read_resource("api:///boom"), do: raise("kaboom!")
+    def read_resource(_uri), do: {:error, "Resource not found"}
+
+    @impl true
+    def prompts do
+      [%{name: "explode", description: "Raises", arguments: []}]
+    end
+
+    @impl true
+    def get_prompt("explode", _args), do: raise("prompt explosion!")
+    def get_prompt(_name, _args), do: {:error, "Prompt not found"}
+  end
+
+  describe "resources/read exception safety" do
+    test "returns MCP error when read_resource raises" do
+      msg = request("resources/read", 1, %{"uri" => "api:///boom"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, RaisingMCPHandler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "kaboom!"
+    end
+  end
+
+  describe "prompts/get exception safety" do
+    test "returns MCP error when get_prompt raises" do
+      msg = request("prompts/get", 1, %{"name" => "explode"})
+
+      assert {:reply, 200, response} = Handler.handle(msg, RaisingMCPHandler)
+      assert response.error.code == -32_602
+      assert response.error.message =~ "prompt explosion!"
+    end
+  end
+
   describe "notifications" do
     test "initialized returns 202 with nil body" do
       msg = notification("notifications/initialized")

@@ -8,11 +8,12 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 
 ## 🎯 Current Focus
 
-**Phase 3 — MCP Server Framework** — Build reusable MCP server infrastructure.
+**Phase 3 — MCP Server Framework** — T1/T2/T4 complete. Remaining: T3 (MPP payment layer).
 
 ### ✅ Recently Completed
 | Task | Description | Notes |
 |------|-------------|-------|
+| T4 | Resource/prompt registration | `use ApiToolkit.MCP` now accepts `:resources` and `:prompts` options. Declarative registration with runtime dispatch. Full test coverage for Handler success paths |
 | T2 | Tool registration DSL | `use ApiToolkit.MCP` macro + `ToolBuilder` pure functions. Auto-converts `defapi` endpoints → MCP tools. Path-based naming, dispatch map for T3 |
 | T1 | MCP JSON-RPC server | Behaviour + Handler + Plug, protocol 2025-03-26. Fixed: `_json` batch unwrapping, batched `initialize` rejection, empty body parse error, version negotiation per spec, capability/operation callback alignment, `Code.ensure_loaded` for handler modules |
 | T7 | Proxy-aware remote IP plug | Configurable header, IPv4+IPv6 |
@@ -51,8 +52,7 @@ Expose API endpoints as MCP tools so AI agents (Claude Code, Cursor, Windsurf) c
       Translate MPP's HTTP 402 challenge/credential/receipt flow to MCP JSON-RPC transport per the [MPP MCP transport binding spec](https://mpp.dev/protocol/transports/mcp). Error code `-32042` (Payment Required) with challenges in `error.data.challenges`. Error code `-32043` (Payment Verification Failed). Credentials in `params._meta["org.paymentauth/credential"]`, receipts in `result._meta["org.paymentauth/receipt"]`. Reuses `MPP.Plug.init/1` for config building to guarantee byte-identical HMAC binding. Advertises payment capabilities in `initialize` response under `capabilities.experimental.payment`. Records rejections for metrics integration.
       📂 `../mpp/lib/mpp/plug.ex` (HTTP 402 flow), `../mpp/lib/mpp/challenge.ex`, `../mpp/lib/mpp/credential.ex`, `../mpp/lib/mpp/receipt.ex`
 
-- ⬜ **T4: Resource/prompt registration** [D:2/B:4/U:5 → Eff:2.25] 🎯
-      Let consumers register MCP resources (e.g., OpenAPI spec, llms.txt, discovery metadata) and prompt templates via callback module. Resources support `resources/read` with URI-based lookup. Prompts support `prompts/get` with argument substitution.
+- ✅ **T4: Resource/prompt registration** [D:2/B:4/U:5 → Eff:2.25] 🎯
 
 ## Phase 4 — Agent Discovery
 
