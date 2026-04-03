@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **ApiToolkit.OpenAPI** — OpenAPI 3.1 document generator from Discovery metadata. `render/2` follows the same pattern as Homepage and LLMs (Discovery module + opts). Returns a JSON-serializable map. GET endpoints produce query `parameters`; POST endpoints produce `requestBody` with JSON schema. Optional `:pricing` function enables per-endpoint `x-payment-info` extensions and 402 responses. Optional `:categories` and `:docs` add `x-service-info` at document root. Additional info fields: `:description`, `:contact`, `:license`, `:url` (servers).
+
 - **ApiToolkit.LLMs** — Markdown document generator for LLM consumption from Discovery metadata. `render/2` mirrors Homepage's API pattern (`:name`, `:version`, `:description`, `:url`, `:discovery_paths`, `:group_by`, `:group_labels`). Additionally supports `:pricing` — a user-provided function returning per-endpoint pricing text or nil. Renders full parameter documentation (type, required flag, description, examples), example GET request URLs, and a Discovery footer with horizontal rule separator.
 
 - **ApiToolkit.Homepage** — Plain-text homepage generator from Discovery metadata. `render/2` takes a Discovery module and options (`:name`, `:version`, `:description`, `:url`, `:discovery_paths`). Configurable endpoint grouping via `:group_by` function — no hardcoded tier concept. Formats GET endpoints with example query strings from `defapi` param `:example` metadata. Designed for terminal and agent consumption.

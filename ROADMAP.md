@@ -8,11 +8,12 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 
 ## 🎯 Current Focus
 
-**Phase 4 — Agent Discovery** — T11 and T12 complete. T10 (OpenAPI) next (T9 pricing optional — T10 works without it, `x-payment-info` extensions activate when T9 is done).
+**Phase 4 — Agent Discovery** — T10, T11, T12 complete. T9 (per-endpoint pricing) next — depends on T3 (MPP payment layer).
 
 ### ✅ Recently Completed
 | Task | Description | Notes |
 |------|-------------|-------|
+| T10 | OpenAPI 3.1 generation | `ApiToolkit.OpenAPI.render/2` — JSON-serializable map from Discovery metadata. GET→query params, POST→requestBody. Optional `:pricing` for `x-payment-info`/402, `:categories`/`:docs` for `x-service-info` |
 | T11 | llms.txt generation | `ApiToolkit.LLMs.render/2` — Markdown for LLM consumption. Per-endpoint param docs, example requests, optional `:pricing` function, configurable grouping |
 | T12 | Plain-text homepage | `ApiToolkit.Homepage.render/2` — generic, configurable grouping via `:group_by` function. No hardcoded tier concept |
 | T4 | Resource/prompt registration | `use ApiToolkit.MCP` now accepts `:resources` and `:prompts` options. Declarative registration with runtime dispatch. Full test coverage for Handler success paths |
@@ -66,7 +67,7 @@ Auto-generated documentation endpoints from Provider/Discovery metadata. Makes a
       `ApiToolkit.Discovery` pricing enrichment — support per-endpoint/per-tier pricing declarations in `defapi` metadata. Flow pricing through Discovery → OpenAPI (`x-payment-info`) → LLMs → MCP challenges. Currently Strip0x uses uniform pricing for all paid endpoints; this enables tiered pricing (e.g., Basic $0.0001, Data $0.01, Compute $0.10) configurable per-endpoint or per-tier group. Pricing read at request time from app config (same runtime pattern as MPP).
       📂 `../strip0x/lib/strip0x/discovery.ex` (current uniform pricing), `../mpp/lib/mpp/plug.ex` (runtime config pattern)
 
-- ⬜ **T10: OpenAPI 3.1 generation** [D:3/B:6/U:7 → Eff:2.17] 🎯
+- ✅ **T10: OpenAPI 3.1 generation** [D:3/B:6/U:7 → Eff:2.17] 🎯
       `ApiToolkit.OpenAPI` — auto-generates OpenAPI 3.1 document from Provider/Discovery endpoint metadata. GET → query parameters, POST → requestBody with JSON schema. MPP `x-payment-info` extensions for paid endpoints (uses per-endpoint pricing from T9). `x-service-info` with docs URLs. Configurable server info, contact, license.
       📂 `../strip0x/lib/strip0x/openapi.ex` + `../strip0x/test/strip0x/openapi_test.exs`
 
