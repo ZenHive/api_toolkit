@@ -39,7 +39,7 @@ mix format                        # Format code (uses Styler plugin)
 
 ## Architecture
 
-Sixteen composable modules across five layers:
+Seventeen composable modules across five layers:
 
 **Infrastructure (GenServer + ETS):**
 - **`ApiToolkit.Cache`** - GenServer wrapping a named ETS table with TTL. Periodic cleanup via `Process.send_after`. Public ETS reads bypass the GenServer for concurrency.
@@ -66,6 +66,7 @@ Sixteen composable modules across five layers:
 
 **Agent Discovery:**
 - **`ApiToolkit.Homepage`** - Pure-function module generating a plain-text homepage from Discovery metadata. `render/2` takes a Discovery module + opts (`:name`, `:version`, `:description`, `:url`, `:discovery_paths`, `:group_by`, `:group_labels`). Configurable endpoint grouping via `:group_by` function — no hardcoded tier concept. Formats GET endpoints with example query strings from param `:example` metadata.
+- **`ApiToolkit.LLMs`** - Pure-function module generating Markdown documentation optimized for LLM consumption. `render/2` mirrors Homepage's API (same opts) plus `:pricing` (function returning per-endpoint pricing text or nil). Renders full parameter documentation (type, required, description, examples), example GET request URLs, and a Discovery footer. Designed for `llms.txt` endpoints.
 
 **Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface. Plug modules compose in a pipeline: RemoteIp → RateLimit → Router dispatch via Helpers. MCP Server exposes tools via JSON-RPC — consumers implement the `MCP.Server` behaviour and forward `/mcp` to `MCP.Plug`.
 

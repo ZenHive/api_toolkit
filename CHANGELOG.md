@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **ApiToolkit.LLMs** — Markdown document generator for LLM consumption from Discovery metadata. `render/2` mirrors Homepage's API pattern (`:name`, `:version`, `:description`, `:url`, `:discovery_paths`, `:group_by`, `:group_labels`). Additionally supports `:pricing` — a user-provided function returning per-endpoint pricing text or nil. Renders full parameter documentation (type, required flag, description, examples), example GET request URLs, and a Discovery footer with horizontal rule separator.
+
 - **ApiToolkit.Homepage** — Plain-text homepage generator from Discovery metadata. `render/2` takes a Discovery module and options (`:name`, `:version`, `:description`, `:url`, `:discovery_paths`). Configurable endpoint grouping via `:group_by` function — no hardcoded tier concept. Formats GET endpoints with example query strings from `defapi` param `:example` metadata. Designed for terminal and agent consumption.
 
 - **Resource/prompt registration** — `use ApiToolkit.MCP` now accepts optional `:resources` and `:prompts` options for declarative MCP resource and prompt registration. Resources declare a `:read` function called at runtime; prompts declare a `:handler` function receiving arguments. The macro generates `resources/0`, `read_resource/1`, `prompts/0`, and `get_prompt/2` callbacks. Handler capability advertisement correctly gates on both listing AND operation callbacks being present.

@@ -8,11 +8,12 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 
 ## 🎯 Current Focus
 
-**Phase 4 — Agent Discovery** — Starting. T12 complete, T11 next.
+**Phase 4 — Agent Discovery** — T11 and T12 complete. T10 (OpenAPI) next (T9 pricing optional — T10 works without it, `x-payment-info` extensions activate when T9 is done).
 
 ### ✅ Recently Completed
 | Task | Description | Notes |
 |------|-------------|-------|
+| T11 | llms.txt generation | `ApiToolkit.LLMs.render/2` — Markdown for LLM consumption. Per-endpoint param docs, example requests, optional `:pricing` function, configurable grouping |
 | T12 | Plain-text homepage | `ApiToolkit.Homepage.render/2` — generic, configurable grouping via `:group_by` function. No hardcoded tier concept |
 | T4 | Resource/prompt registration | `use ApiToolkit.MCP` now accepts `:resources` and `:prompts` options. Declarative registration with runtime dispatch. Full test coverage for Handler success paths |
 | T2 | Tool registration DSL | `use ApiToolkit.MCP` macro + `ToolBuilder` pure functions. Auto-converts `defapi` endpoints → MCP tools. Path-based naming, dispatch map for T3 |
@@ -69,9 +70,7 @@ Auto-generated documentation endpoints from Provider/Discovery metadata. Makes a
       `ApiToolkit.OpenAPI` — auto-generates OpenAPI 3.1 document from Provider/Discovery endpoint metadata. GET → query parameters, POST → requestBody with JSON schema. MPP `x-payment-info` extensions for paid endpoints (uses per-endpoint pricing from T9). `x-service-info` with docs URLs. Configurable server info, contact, license.
       📂 `../strip0x/lib/strip0x/openapi.ex` + `../strip0x/test/strip0x/openapi_test.exs`
 
-- ⬜ **T11: llms.txt generation** [D:2/B:5/U:7 → Eff:3.0] 🎯 `[P]`
-      `ApiToolkit.LLMs` — auto-generates LLM-readable plain-text API overview from Discovery metadata. Groups by tier (free/paid), includes parameter descriptions, example requests, pricing. Generic for any agent-facing API service.
-      📂 `../strip0x/lib/strip0x/llms.ex` + `../strip0x/test/strip0x/llms_test.exs`
+- ✅ **T11: llms.txt generation** [D:2/B:5/U:7 → Eff:3.0] 🎯 `[P]`
 
 - ✅ **T12: Plain-text homepage** [D:1/B:3/U:4 → Eff:3.5] 🎯 `[P]`
 
