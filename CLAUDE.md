@@ -39,7 +39,7 @@ mix format                        # Format code (uses Styler plugin)
 
 ## Architecture
 
-Fifteen composable modules across four layers:
+Sixteen composable modules across five layers:
 
 **Infrastructure (GenServer + ETS):**
 - **`ApiToolkit.Cache`** - GenServer wrapping a named ETS table with TTL. Periodic cleanup via `Process.send_after`. Public ETS reads bypass the GenServer for concurrency.
@@ -64,6 +64,9 @@ Fifteen composable modules across four layers:
 - **`ApiToolkit.MCP`** - `use ApiToolkit.MCP` macro generates a complete `MCP.Server` implementation from a Discovery module. Options: `:discovery`, `:server_info`, `:strip_prefixes`, `:tool_name`, `:tiers`, `:resources`, `:prompts`. Generates `tools/0`, `server_info/0`, `dispatch_map/0`, and optionally `resources/0`, `read_resource/1`, `prompts/0`, `get_prompt/2`. Resources declare a `:read` function; prompts declare a `:handler` function. Private helper functions (`__mcp_resources__/0`, `__mcp_prompts__/0`) hold the raw definitions with anonymous functions at runtime.
 - **`ApiToolkit.MCP.ToolBuilder`** - Pure-function module converting Provider/Discovery endpoints into MCP tool definitions. Path-based naming (`/api/hex/encode` → `hex_encode`), JSON Schema generation from Provider params, Provider→MCP result translation (strips cache TTL, maps errors). `dispatch_map/2` returns `%{tool_name => {module, function, tier}}` for T3 payment layer.
 
+**Agent Discovery:**
+- **`ApiToolkit.Homepage`** - Pure-function module generating a plain-text homepage from Discovery metadata. `render/2` takes a Discovery module + opts (`:name`, `:version`, `:description`, `:url`, `:discovery_paths`, `:group_by`, `:group_labels`). Configurable endpoint grouping via `:group_by` function — no hardcoded tier concept. Formats GET endpoints with example query strings from param `:example` metadata.
+
 **Key pattern**: Provider defines endpoints via `defapi` macro, Discovery aggregates multiple Providers. Consumer apps `use` both to get a self-documenting API surface. Plug modules compose in a pipeline: RemoteIp → RateLimit → Router dispatch via Helpers. MCP Server exposes tools via JSON-RPC — consumers implement the `MCP.Server` behaviour and forward `/mcp` to `MCP.Plug`.
 
 **Self-describing API (Descripex)**: The 4 infrastructure modules (Cache, RateLimiter, InboundLimiter, Metrics) use `api()` macro annotations for machine-readable introspection. The root `ApiToolkit` module uses `Descripex.Discoverable` for progressive disclosure: `ApiToolkit.describe/0` (overview), `describe/1` (module functions), `describe/2` (function detail).
@@ -78,6 +81,7 @@ Test support modules live in `test/support/` (compiled only in `:test` via `elix
 - `TestMCPHandlerFull` - MCP handler implementing all optional callbacks (resources, read_resource, prompts, get_prompt) for success path tests
 - `TestMCPToolsHandler` - MCP handler generated via `use ApiToolkit.MCP` from TestDiscovery for tool registration DSL tests
 - `TestMCPResourcesPromptsHandler` - MCP handler generated via `use ApiToolkit.MCP` with `:resources` and `:prompts` options for macro registration tests
+- `HomepageTestProvider` - Provider with POST endpoint and `:example` params for Homepage rendering tests. Defines nested `HomepageTestProvider.Discovery`
 
 ## Git Commit Configuration
 

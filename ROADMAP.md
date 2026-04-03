@@ -8,11 +8,12 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 
 ## 🎯 Current Focus
 
-**Phase 3 — MCP Server Framework** — T1/T2/T4 complete. Remaining: T3 (MPP payment layer).
+**Phase 4 — Agent Discovery** — Starting. T12 complete, T11 next.
 
 ### ✅ Recently Completed
 | Task | Description | Notes |
 |------|-------------|-------|
+| T12 | Plain-text homepage | `ApiToolkit.Homepage.render/2` — generic, configurable grouping via `:group_by` function. No hardcoded tier concept |
 | T4 | Resource/prompt registration | `use ApiToolkit.MCP` now accepts `:resources` and `:prompts` options. Declarative registration with runtime dispatch. Full test coverage for Handler success paths |
 | T2 | Tool registration DSL | `use ApiToolkit.MCP` macro + `ToolBuilder` pure functions. Auto-converts `defapi` endpoints → MCP tools. Path-based naming, dispatch map for T3 |
 | T1 | MCP JSON-RPC server | Behaviour + Handler + Plug, protocol 2025-03-26. Fixed: `_json` batch unwrapping, batched `initialize` rejection, empty body parse error, version negotiation per spec, capability/operation callback alignment, `Code.ensure_loaded` for handler modules |
@@ -72,9 +73,7 @@ Auto-generated documentation endpoints from Provider/Discovery metadata. Makes a
       `ApiToolkit.LLMs` — auto-generates LLM-readable plain-text API overview from Discovery metadata. Groups by tier (free/paid), includes parameter descriptions, example requests, pricing. Generic for any agent-facing API service.
       📂 `../strip0x/lib/strip0x/llms.ex` + `../strip0x/test/strip0x/llms_test.exs`
 
-- ⬜ **T12: Plain-text homepage** [D:1/B:3/U:4 → Eff:3.5] 🎯 `[P]`
-      `ApiToolkit.Homepage` — dynamic plain-text homepage from Discovery metadata. Lists all endpoints with examples, discovery URLs, version info. Configurable service name and description. Cache-Control header.
-      📂 `../strip0x/lib/strip0x/homepage.ex` + `../strip0x/test/strip0x/homepage_test.exs`
+- ✅ **T12: Plain-text homepage** [D:1/B:3/U:4 → Eff:3.5] 🎯 `[P]`
 
 ## Phase 5 — Ideas
 

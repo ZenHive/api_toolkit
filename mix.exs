@@ -44,7 +44,9 @@ defmodule ApiToolkit.MixProject do
       {:ex_unit_json, ">= 0.4.0", only: [:dev, :test], runtime: false},
       {:dialyzer_json, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:styler, ">= 0.0.0", only: [:dev, :test], runtime: false},
-      {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      # TODO: Using git branch as workaround for Credo 1.7.x crash on Elixir 1.20-rc sigils.
+      # Switch back to hex {:credo, ">= 0.0.0"} when a compatible release is published.
+      {:credo, github: "rrrene/credo", branch: "release/1.7", only: [:dev, :test], runtime: false},
       {:sobelow, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:dialyxir, ">= 0.0.0", only: [:dev, :test], runtime: false},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
