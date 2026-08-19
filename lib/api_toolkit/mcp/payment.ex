@@ -51,11 +51,7 @@ defmodule ApiToolkit.MCP.Payment do
     under `:mpp_payment`.
     """
 
-    # `mpp` holds an `MPP.Plug.Config.t()`. It is typed loosely and never
-    # pattern-matched as a struct literal so that `:mpp` can stay an optional
-    # dependency — a `%MPP.Plug.Config{}` pattern would bind the module at
-    # compile time and break consumers who don't pull mpp.
-    @type t :: %__MODULE__{mpp: term(), rejections: atom() | nil}
+    @type t :: %__MODULE__{mpp: MPP.Plug.Config.t(), rejections: atom() | nil}
 
     @enforce_keys [:mpp]
     defstruct [:mpp, :rejections]

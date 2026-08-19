@@ -83,9 +83,7 @@ defmodule ApiToolkit.MCP do
 
   ## Payment Gating (T3)
 
-  Gate paid tools behind MPP payment credentials. Requires `{:mpp, "~> 0.14"}`
-  as a dependency — it is optional in `api_toolkit`, so consumers using payment
-  gating must declare it themselves.
+  Gate paid tools behind MPP payment credentials.
 
       use ApiToolkit.MCP,
         discovery: MyApp.Discovery,

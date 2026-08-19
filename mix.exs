@@ -42,11 +42,13 @@ defmodule ApiToolkit.MixProject do
       # HTTP middleware — needed by Plug.RemoteIp, Plug.RateLimit, Router.Helpers
       {:plug, "~> 1.16"},
 
-      # Machine Payments Protocol — payment gating for MCP tools (T3).
-      # Optional: only ApiToolkit.MCP.Payment needs it, and it pulls the whole
-      # on-chain stack (onchain, onchain_tempo, cartouche, decimal, ...).
-      # Consumers using payment gating declare {:mpp, "~> 0.14"} themselves.
-      {:mpp, "~> 0.14", optional: true},
+      # Machine Payments Protocol — owns the MCP payment transport ApiToolkit.MCP.Payment
+      # gates on top of. Required, not optional: marking it optional would buy a
+      # configuration this suite can never exercise (mpp is always present here) while
+      # forcing lib/ to avoid MPP structs and types — a constraint that only breaks at a
+      # consumer's build. If the on-chain tree it pulls ever becomes a real burden, the
+      # fix is to split the payment layer into its own package, not to loosen this.
+      {:mpp, "~> 0.14"},
 
       # Dev/test tooling — AI-friendly output
       {:ex_unit_json, "~> 0.6.0", only: [:dev, :test], runtime: false},
