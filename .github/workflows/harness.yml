@@ -1,0 +1,152 @@
+# Deterministic Elixir harness gate for PRs.
+# Closes the Codex-env-blocked-hex.pm gap: every PR push gets format / compile /
+# credo / doctor / sobelow / test+cover / dialyzer evidence as PR checks, instead
+# of needing a local reviewer to fetch the branch and run the suite.
+#
+# **Dialyzer-in-CI default: KEEP it.** If your repo's CI shows OOM during PLT
+# module-add (signature: `runner has received a shutdown signal` mid-
+# construction), see the comment block above the `Dialyzer` step at the
+# bottom of this file — the recommended fix ordering is `:plt_ignore_apps`
+# trim first, then a separate larger-runner workflow, drop only as last
+# resort. "Dialyzer doesn't fit in CI" is NOT the generic claim — most
+# Elixir repos fit comfortably.
+#
+# No untrusted-input interpolation — only matrix, runner, beam outputs, hashFiles.
+#
+# Customization points (search for "[CUSTOMIZE]"):
+#   1. Branch trigger    — `main` (this repo's default branch).
+#   2. MIX_ENV            — default `test`; override only if the repo uses a
+#                          non-standard test env.
+#   3. Coverage threshold — 85 (project default tier). See note below: mix.exs
+#                          did not yet carry a `--cover-threshold` value when
+#                          this workflow was written (parallel in-flight edit);
+#                          re-verify this matches `mix precommit`'s threshold.
+#   4. Integration tag    — default `integration`; no `:integration`-tagged
+#                          tests exist in this repo yet (verified via grep),
+#                          so the exclusion is a no-op today but kept for
+#                          forward compatibility.
+#
+# Versions are sourced from `.tool-versions` (asdf format) at the repo root via
+# `setup-beam` — guarantees CI and local dev never drift on `mix format` output.
+# NOTE: `.tool-versions` did not exist yet at the time this workflow was
+# written (a parallel agent is creating it with the host's real Elixir
+# 1.20.x / OTP 29 versions). The step below reads from it regardless — the
+# file is expected to land before this workflow's first run.
+
+name: Harness
+
+on:
+  pull_request:
+    branches: [main]   # [CUSTOMIZE 1]: branch trigger
+  push:
+    branches: [main]   # [CUSTOMIZE 1]: branch trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    name: Harness
+    runs-on: ubuntu-latest
+    env:
+      MIX_ENV: test           # [CUSTOMIZE 2]: MIX_ENV
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: beam
+        uses: erlef/setup-beam@v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      # `priv/plts` (not the dialyxir `_build/<env>/dialyxir_*.plt` default) is
+      # this repo's PLT path — mix.exs sets `plt_local_path`/`plt_core_path` to
+      # `priv/plts` so PLTs survive `_build` wipes. Cache it explicitly or every
+      # run rebuilds the PLT from scratch (~1-2 min) instead of hitting cache.
+      - name: Cache deps & _build & priv/plts (dialyxir PLT path)
+        uses: actions/cache@v6
+        with:
+          path: |
+            deps
+            _build
+            priv/plts
+          key: mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-elixir${{ steps.beam.outputs.elixir-version }}-
+
+      - run: mix deps.get
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Format check
+        run: mix format --check-formatted
+
+      # tag_todo / tag_fixme stay enabled in .credo.exs (TODO/FIXME = tracked-debt
+      # visibility, not regressions; see ~/.claude/includes/development-philosophy.md
+      # § "TODO Comment Requirements"). Excluding them here lets the harness fail
+      # only on real Credo regressions — TODO accumulation across sessions
+      # shouldn't gate PRs.
+      - name: Credo (strict, excluding TODO/FIXME design tags)
+        run: mix credo --strict --ignore TagTODO,TagFIXME
+
+      # `--raise` overrides .doctor.exs raise=false to gate CI without changing
+      # local behavior. If the target repo has .doctor.exs raise: true already,
+      # this is redundant but harmless.
+      - name: Doctor (--raise overrides .doctor.exs raise=false to gate CI)
+        run: mix doctor --raise
+
+      # `--skip` matches this repo's `mix precommit` alias in mix.exs: it honors
+      # inline `# sobelow_skip` annotations and `.sobelow-skips` fingerprints
+      # (library ships Plug modules — see elixir-setup.md § "Suppressing
+      # Sobelow False Positives"). Without `--skip` here, CI would re-flag
+      # findings the local precommit gate treats as suppressed.
+      - name: Sobelow (--skip honors .sobelow-skips / inline annotations)
+        run: mix sobelow --skip
+
+      # Coverage tiers (per ~/.claude/includes/critical-rules.md § "RAISE
+      # COVERAGE BEFORE MUTATING"):
+      #   80% — standard business logic
+      #   85% — project default (cartouche's empirical floor; meaningful bump
+      #         from 80%, leaves headroom under typical ~87% project coverage)
+      #   95% — critical paths (signing, money, crypto, wire-format encoders)
+      # Per-module 95% gating for critical paths is a separate ratchet (see
+      # elixir-ci-harness SKILL.md § "Per-module 95% ratchet"); this is the
+      # aggregate floor. Keep this number in sync with the `--cover-threshold`
+      # used by `mix precommit` in mix.exs — they must agree.
+      # `--exclude integration` because CI lacks credentials/network for live
+      # services; this repo has no `:integration`-tagged tests today (verified).
+      - name: Tests + coverage gate (>=85%)
+        run: mix test.json --cover --cover-threshold 85 --summary-only --exclude integration   # [CUSTOMIZE 3,4]
+
+      # Dialyzer-in-CI guidance (default: KEEP this step):
+      #
+      # Most Elixir repos fit dialyzer into 16 GB `ubuntu-latest` comfortably.
+      # If your repo's CI shows OOM during PLT module-add (signature:
+      # `runner has received a shutdown signal` mid-construction), the fix
+      # ordering is:
+      #
+      #   1. Trim heavy generated-API deps via `:plt_ignore_apps` in mix.exs.
+      #      Common candidates: `:google_api_*` (each Google API client ships
+      #      ~600 generated REST modules), `:goth`, `:google_gax`, `:tesla`,
+      #      `:jose`. Add `.dialyzer_ignore.exs` entries for the resulting
+      #      `:unknown_function` warnings on files that use the trimmed deps.
+      #      Reference: googleapis/elixir-google-api `presubmit.yml` runs
+      #      zero dialyzer in their own CI — `:plt_ignore_apps` IS the
+      #      canonical pattern for this dep family; there's no further
+      #      upstream slimming lever to leverage.
+      #
+      #   2. Move dialyzer to a separate workflow on a larger runner
+      #      (`ubuntu-latest-large`, 32 GB) triggered only on push-to-main
+      #      or scheduled cron — keeps PR CI fast; dialyzer signal arrives
+      #      at merge/nightly cadence.
+      #
+      #   3. Drop the dialyzer step entirely ONLY as a last resort, after
+      #      both 1 and 2 have been ruled out. This is a repo-specific
+      #      decision; don't generalize.
+      - name: Dialyzer
+        run: mix dialyzer

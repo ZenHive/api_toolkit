@@ -1,0 +1,3 @@
+[mcp_servers.tidewave]
+url = "http://localhost:4032/tidewave/mcp"
+enabled = true

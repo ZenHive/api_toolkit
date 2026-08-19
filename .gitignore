@@ -26,3 +26,9 @@ api_toolkit-*/
 # Hex docs cache (built via "mix hex.docs fetch").
 .hex-docs/
 
+
+# Dialyzer PLTs — kept outside _build so `mix clean` does not force a rebuild.
+/priv/plts/
+
+# Claude Code: project settings are committed; local overrides are not.
+.claude/settings.local.json

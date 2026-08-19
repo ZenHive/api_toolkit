@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Synced from claude-marketplace/templates/.coderabbit.yaml — run sync-coderabbit-yaml.sh to refresh.
+# Comments-only mode: no commit-pushing, no separate UTG PRs.
+
+reviews:
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+  auto_apply_fixes: false           # no orphan coderabbitai/autofix/<sha> branches
+  auto_generate_unit_tests: false   # no racing UTG PRs
