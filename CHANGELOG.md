@@ -22,6 +22,12 @@ All notable changes to this project will be documented in this file.
 
 - **ApiToolkit.MCP.ToolBuilder** — Pure-function module converting Provider/Discovery endpoints into MCP tool definitions. Path-based tool naming (`/api/hex/encode` → `hex_encode`), JSON Schema generation from Provider params, result translation (strips cache TTL, maps Provider errors to MCP format). Dispatch map links tool names to `{module, function, tier}` tuples — extensibility seam for T3 payment layer.
 
+### Changed
+
+- **Dependency pins are now version-bounded.** The dev/test tooling was pinned with `>= 0.0.0` and Credo was sourced from a git branch as a workaround for a Credo 1.7.x crash on Elixir 1.20-rc sigils; Credo 1.7.19 fixes that upstream, so it is back on Hex. `descripex` moved from `~> 0.6` to `~> 0.12` — the lockfile already resolved 0.12.1 and the old bound over-claimed compatibility with 0.6-0.11.
+
+- **Toolchain and CI.** Added a GitHub Actions workflow mirroring the local gate (format, `compile --warnings-as-errors`, Credo, doctor, sobelow, tests with an 85% coverage floor, dialyzer), a `.credo.exs` with the ExSlop and ExDNA plugins, dialyzer configured against `priv/plts` with `plt_add_deps: :apps_direct`, and three check aliases: `check.fast` (format · compile · credo), `precommit`, and `precommit.full` (adds dialyzer). Runtime introspection is available via `mix tidewave` on port 4032.
+
 ### Fixed
 
 - **MCP.Payment**: Challenge IDs are now HMAC-bound the way every other MPP SDK binds them. The previous implementation, written against mpp 0.3 before MPP shipped an MCP transport, HMAC'd the raw JCS string where MPP binds `base64url(JCS(request))` — so its challenges could not be verified by mpp-rs, mppx, or `MPP.Client.MCP`. It also verified against the credential's *echoed* realm rather than the server's configured one, never bound `intent`, accepted challenges with no expiration, had no replay protection, and raised an uncaught `FunctionClauseError` (surfacing as a 500) on a request containing a float. Delegating to `MPP.Mcp` resolves all of these; `MPP.Verifier` additionally adds Tier-2 pinned-field checks and telemetry.
