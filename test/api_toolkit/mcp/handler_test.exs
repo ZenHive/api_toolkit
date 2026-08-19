@@ -179,7 +179,9 @@ defmodule ApiToolkit.MCP.HandlerTest do
 
       assert {:reply, 200, response} = Handler.handle(msg, @handler)
       assert response.result.content == [%{type: "text", text: "hello"}]
-      assert response.result._meta == %{request_id: "abc-123"}
+      # String key: MPP.Mcp.attach_receipt/3 reads and writes `result["_meta"]`,
+      # so an atom would let a paid tool emit `_meta` twice in the JSON.
+      assert response.result["_meta"] == %{request_id: "abc-123"}
     end
   end
 

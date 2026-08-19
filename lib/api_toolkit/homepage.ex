@@ -121,6 +121,7 @@ defmodule ApiToolkit.Homepage do
 
   # Renders the discovery paths section
   defp discovery_section(nil), do: nil
+  defp discovery_section([]), do: nil
 
   defp discovery_section(paths) do
     lines = Enum.map_join(paths, "\n", fn {method, path, desc} -> "  #{method} #{path}  #{desc}" end)

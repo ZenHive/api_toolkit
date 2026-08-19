@@ -117,9 +117,23 @@ defmodule ApiToolkit.MCP.Server do
   @doc "Returns additional server capabilities merged into the `initialize` response."
   @callback capabilities() :: map()
 
+  @doc "Returns payment config for MCP payment gating, or `nil` if not configured."
+  @callback payment_config() :: ApiToolkit.MCP.Payment.Config.t() | nil
+
+  @doc """
+  Returns `%{tool_name => {module, function, tier}}` for payment tier lookup.
+
+  Required alongside `payment_config/0`: `ApiToolkit.MCP.Payment` fails closed
+  and treats every tool as paid when a handler under a payment config doesn't
+  expose its tiers here. `use ApiToolkit.MCP` generates this callback.
+  """
+  @callback dispatch_map() :: %{String.t() => {module(), atom(), atom()}}
+
   @optional_callbacks resources: 0,
                       read_resource: 1,
                       prompts: 0,
                       get_prompt: 2,
-                      capabilities: 0
+                      capabilities: 0,
+                      payment_config: 0,
+                      dispatch_map: 0
 end

@@ -19,6 +19,8 @@ defmodule ApiToolkit.MCP.Handler do
   Implements MCP protocol version `2025-03-26` over JSON-RPC 2.0.
   """
 
+  alias ApiToolkit.MCP.Payment
+
   @protocol_version "2025-03-26"
 
   @typedoc "Handler response: reply with HTTP status and optional body, or error."
@@ -110,19 +112,27 @@ defmodule ApiToolkit.MCP.Handler do
         _ -> %{}
       end
 
-    dispatch_method(method, id, params, handler, assigns)
+    dispatch_method(method, id, params, message, handler, assigns)
   end
 
-  defp dispatch_method("initialize", id, params, handler, _assigns), do: handle_initialize(id, params, handler)
-  defp dispatch_method("ping", id, _params, _handler, _assigns), do: {:reply, 200, wrap_result(id, %{})}
-  defp dispatch_method("tools/list", id, _params, handler, _assigns), do: handle_tools_list(id, handler)
-  defp dispatch_method("tools/call", id, params, handler, assigns), do: handle_tools_call(id, params, handler, assigns)
-  defp dispatch_method("resources/list", id, _params, handler, _assigns), do: handle_resources_list(id, handler)
-  defp dispatch_method("resources/read", id, params, handler, _assigns), do: handle_resources_read(id, params, handler)
-  defp dispatch_method("prompts/list", id, _params, handler, _assigns), do: handle_prompts_list(id, handler)
-  defp dispatch_method("prompts/get", id, params, handler, _assigns), do: handle_prompts_get(id, params, handler)
+  defp dispatch_method("initialize", id, params, _msg, handler, _assigns), do: handle_initialize(id, params, handler)
+  defp dispatch_method("ping", id, _params, _msg, _handler, _assigns), do: {:reply, 200, wrap_result(id, %{})}
+  defp dispatch_method("tools/list", id, _params, _msg, handler, _assigns), do: handle_tools_list(id, handler)
 
-  defp dispatch_method(method, id, _params, _handler, _assigns),
+  defp dispatch_method("tools/call", id, params, msg, handler, assigns),
+    do: handle_tools_call(id, params, msg, handler, assigns)
+
+  defp dispatch_method("resources/list", id, _params, _msg, handler, _assigns), do: handle_resources_list(id, handler)
+
+  defp dispatch_method("resources/read", id, params, msg, handler, assigns),
+    do: handle_resources_read(id, params, msg, handler, assigns)
+
+  defp dispatch_method("prompts/list", id, _params, _msg, handler, _assigns), do: handle_prompts_list(id, handler)
+
+  defp dispatch_method("prompts/get", id, params, msg, handler, assigns),
+    do: handle_prompts_get(id, params, msg, handler, assigns)
+
+  defp dispatch_method(method, id, _params, _msg, _handler, _assigns),
     do: {:reply, 200, jsonrpc_error(id, -32_601, "Method not found", %{method: method})}
 
   # Notification dispatch
@@ -189,24 +199,41 @@ defmodule ApiToolkit.MCP.Handler do
     {:reply, 200, wrap_result(id, %{tools: tools})}
   end
 
-  # tools/call — safe dispatch with exception catching
+  # tools/call — safe dispatch with exception catching + payment gating
 
-  defp handle_tools_call(id, %{"name" => name} = params, handler, assigns) do
-    args = Map.get(params, "arguments", %{})
-
+  defp handle_tools_call(id, %{"name" => name} = params, message, handler, assigns) do
     case find_tool(handler, name) do
       {:ok, tool} ->
-        result = safe_call_tool(tool, args, assigns)
-        {:reply, 200, wrap_result(id, format_tool_result(result))}
+        args = Map.get(params, "arguments", %{})
+
+        run_tool = fn -> format_tool_result(safe_call_tool(tool, args, assigns)) end
+
+        case gate_payment(name, message, handler, assigns, run_tool) do
+          :free -> {:reply, 200, wrap_result(id, run_tool.())}
+          {:ok, result} -> {:reply, 200, wrap_result(id, result)}
+          {:error, code, error_message, data} -> {:reply, 200, jsonrpc_error(id, code, error_message, data)}
+        end
 
       :error ->
         {:reply, 200, jsonrpc_error(id, -32_602, "Tool not found", %{name: name})}
     end
   end
 
-  defp handle_tools_call(id, _params, _handler, _assigns) do
+  defp handle_tools_call(id, _params, _message, _handler, _assigns) do
     {:reply, 200, jsonrpc_error(id, -32_602, "Missing required parameter: name")}
   end
+
+  # Payment gating — delegates to MPP via the Payment module when a config is
+  # present in assigns. Returns :free when unconfigured or the tool is free-tier.
+  # `find_tool/2` runs first, so an unknown tool is rejected before any challenge
+  # is generated or the replay store is touched.
+  defp gate_payment(_name, _message, _handler, %{mpp_payment: nil}, _run_tool), do: :free
+
+  defp gate_payment(name, message, handler, %{mpp_payment: config}, run_tool) do
+    Payment.gate_tool_call(name, message, handler, config, run_tool)
+  end
+
+  defp gate_payment(_name, _message, _handler, _assigns, _run_tool), do: :free
 
   defp find_tool(handler, name) do
     case Enum.find(handler.tools(), fn tool -> tool.name == name end) do
@@ -253,8 +280,11 @@ defmodule ApiToolkit.MCP.Handler do
     data
   end
 
+  # "_meta" is a string key on purpose: MPP.Mcp.attach_receipt/3 reads and writes
+  # `result["_meta"]`, so an atom `:_meta` would leave the map carrying both and
+  # emit `_meta` twice in the encoded JSON.
   defp format_tool_result({:ok, text, metadata}) when is_binary(text) and is_map(metadata) do
-    %{content: [%{type: "text", text: text}], _meta: metadata}
+    %{"_meta" => metadata, content: [%{type: "text", text: text}]}
   end
 
   defp format_tool_result({:error, :invalid_arguments}) do
@@ -280,9 +310,9 @@ defmodule ApiToolkit.MCP.Handler do
     {:reply, 200, wrap_result(id, %{resources: resources})}
   end
 
-  # resources/read
+  # TODO(T9): resources/read — assigns threaded for future payment gating
 
-  defp handle_resources_read(id, %{"uri" => uri}, handler) do
+  defp handle_resources_read(id, %{"uri" => uri}, _message, handler, _assigns) do
     if exports?(handler, :read_resource, 1) do
       case safe_read_resource(handler, uri) do
         {:ok, content} ->
@@ -296,7 +326,7 @@ defmodule ApiToolkit.MCP.Handler do
     end
   end
 
-  defp handle_resources_read(id, _params, _handler) do
+  defp handle_resources_read(id, _params, _message, _handler, _assigns) do
     {:reply, 200, jsonrpc_error(id, -32_602, "Missing required parameter: uri")}
   end
 
@@ -311,9 +341,9 @@ defmodule ApiToolkit.MCP.Handler do
     {:reply, 200, wrap_result(id, %{prompts: prompts})}
   end
 
-  # prompts/get
+  # TODO(T9): prompts/get — assigns threaded for future payment gating
 
-  defp handle_prompts_get(id, %{"name" => name} = params, handler) do
+  defp handle_prompts_get(id, %{"name" => name} = params, _message, handler, _assigns) do
     if exports?(handler, :get_prompt, 2) do
       args = Map.get(params, "arguments", %{})
 
@@ -329,7 +359,7 @@ defmodule ApiToolkit.MCP.Handler do
     end
   end
 
-  defp handle_prompts_get(id, _params, _handler) do
+  defp handle_prompts_get(id, _params, _message, _handler, _assigns) do
     {:reply, 200, jsonrpc_error(id, -32_602, "Missing required parameter: name")}
   end
 

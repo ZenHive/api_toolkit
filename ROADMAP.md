@@ -8,7 +8,12 @@ Reusable API infrastructure for Elixir services. Published on [Hex](https://hex.
 
 ## 🎯 Current Focus
 
-**Phase 4 — Agent Discovery** — T10, T11, T12 complete. T9 (per-endpoint pricing) next — depends on T3 (MPP payment layer).
+**Phase 3/4** — T3, T10, T11, T12 complete. T9 (per-endpoint pricing) next.
+
+### 📋 Current Tasks
+| Task | Status | Notes |
+|------|--------|-------|
+| T3 ✅ | MPP payment layer for MCP | Per-tool tier gating over `MPP.Mcp`; protocol, HMAC binding, replay protection and error shaping delegated to mpp 0.14 |
 
 ### ✅ Recently Completed
 | Task | Description | Notes |
@@ -51,9 +56,7 @@ Expose API endpoints as MCP tools so AI agents (Claude Code, Cursor, Windsurf) c
 
 - ✅ **T2: Tool registration DSL** [D:3/B:7/U:8 → Eff:2.5] 🎯
 
-- ⬜ **T3: MPP payment layer for MCP** [D:4/B:7/U:8 → Eff:1.88] 🚀
-      Translate MPP's HTTP 402 challenge/credential/receipt flow to MCP JSON-RPC transport per the [MPP MCP transport binding spec](https://mpp.dev/protocol/transports/mcp). Error code `-32042` (Payment Required) with challenges in `error.data.challenges`. Error code `-32043` (Payment Verification Failed). Credentials in `params._meta["org.paymentauth/credential"]`, receipts in `result._meta["org.paymentauth/receipt"]`. Reuses `MPP.Plug.init/1` for config building to guarantee byte-identical HMAC binding. Advertises payment capabilities in `initialize` response under `capabilities.experimental.payment`. Records rejections for metrics integration.
-      📂 `../mpp/lib/mpp/plug.ex` (HTTP 402 flow), `../mpp/lib/mpp/challenge.ex`, `../mpp/lib/mpp/credential.ex`, `../mpp/lib/mpp/receipt.ex`
+- ✅ **T3: MPP payment layer for MCP** [D:4/B:7/U:8 → Eff:1.88] 🎯
 
 - ✅ **T4: Resource/prompt registration** [D:2/B:4/U:5 → Eff:2.25] 🎯
 

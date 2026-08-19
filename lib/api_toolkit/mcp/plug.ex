@@ -42,15 +42,14 @@ defmodule ApiToolkit.MCP.Plug do
   @impl true
   @spec init(keyword()) :: map()
   def init(opts) do
-    %{
-      handler: Keyword.fetch!(opts, :handler),
-      assigns: Keyword.get(opts, :assigns, %{})
-    }
+    %{handler: Keyword.fetch!(opts, :handler), assigns: Keyword.get(opts, :assigns, %{})}
   end
 
   @impl true
   @spec call(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def call(%{method: "POST"} = conn, %{handler: handler, assigns: assigns}) do
+    assigns = put_payment_config(handler, assigns)
+
     case_result =
       case decode_body(conn) do
         {:ok, message} ->
@@ -74,6 +73,25 @@ defmodule ApiToolkit.MCP.Plug do
     |> put_resp_header("allow", "POST")
     |> send_resp(405, "Method Not Allowed")
     |> halt()
+  end
+
+  # Auto-detects payment_config/0 on the handler and injects it into assigns, so
+  # `use ApiToolkit.MCP, payment: [...]` works without manual assigns wiring.
+  # Explicit :mpp_payment in assigns takes precedence.
+  #
+  # Resolved per request rather than in init/1: Phoenix routers evaluate init/1 at
+  # COMPILE time (`plug_init_mode: :compile`, the prod default), which would bake
+  # the build machine's %Payment.Config{} — secret key included — into the router's
+  # BEAM, and would silently skip gating whenever the handler module isn't compiled
+  # yet when the router compiles.
+  @spec put_payment_config(module(), map()) :: map()
+  defp put_payment_config(handler, assigns) do
+    if not Map.has_key?(assigns, :mpp_payment) and Code.ensure_loaded?(handler) and
+         function_exported?(handler, :payment_config, 0) do
+      Map.put(assigns, :mpp_payment, handler.payment_config())
+    else
+      assigns
+    end
   end
 
   # Routes single messages vs batch arrays to the appropriate Handler function
