@@ -20,16 +20,17 @@ defmodule ApiToolkit.RateLimiter do
   use GenServer
   use Descripex, namespace: "/rate-limiter"
 
+  alias ApiToolkit.Internal.ChildSpec
+
   defstruct [:tokens, :max_tokens, :refill_ms, :waiting]
 
   @type t :: %__MODULE__{
+          # Client API
           tokens: non_neg_integer(),
           max_tokens: pos_integer(),
           refill_ms: pos_integer(),
           waiting: :queue.queue()
         }
-
-  # Client API
 
   @doc """
   Returns a child specification for supervision.
@@ -38,14 +39,7 @@ defmodule ApiToolkit.RateLimiter do
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
-    name = Keyword.fetch!(opts, :name)
-
-    %{
-      id: name,
-      start: {__MODULE__, :start_link, [opts]},
-      type: :worker,
-      restart: :permanent
-    }
+    ChildSpec.build(__MODULE__, Keyword.fetch!(opts, :name), opts)
   end
 
   @doc """
@@ -75,6 +69,7 @@ defmodule ApiToolkit.RateLimiter do
   end
 
   api(:status, "Return the current status of the rate limiter without consuming a token.",
+    # Server callbacks
     params: [
       server: [kind: :config, description: "The rate limiter name or pid"]
     ],
@@ -88,8 +83,6 @@ defmodule ApiToolkit.RateLimiter do
   def status(server) do
     GenServer.call(server, :status)
   end
-
-  # Server callbacks
 
   @impl true
   def init(opts) do
@@ -117,6 +110,8 @@ defmodule ApiToolkit.RateLimiter do
     end
   end
 
+  # Private functions
+
   @impl true
   def handle_call(:status, _from, %__MODULE__{} = state) do
     status = %{
@@ -134,8 +129,6 @@ defmodule ApiToolkit.RateLimiter do
     schedule_refill(state.refill_ms)
     {:noreply, state}
   end
-
-  # Private functions
 
   defp period_to_ms(:second), do: 1_000
   defp period_to_ms(:minute), do: 60_000

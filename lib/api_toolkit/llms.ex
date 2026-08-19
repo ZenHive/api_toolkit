@@ -43,6 +43,8 @@ defmodule ApiToolkit.LLMs do
   Keys without a label are stringified automatically.
   """
 
+  alias ApiToolkit.Internal.ExampleQuery
+
   @type discovery_module :: module()
 
   @type option ::
@@ -149,14 +151,9 @@ defmodule ApiToolkit.LLMs do
 
   # Builds an example request line for GET endpoints
   defp example_line(%{method: :get, path: path, params: params}) do
-    pairs =
-      params
-      |> Enum.filter(&match?(%{example: val} when val != nil and not is_list(val), &1))
-      |> Enum.map(fn p -> "#{p.name}=#{URI.encode_www_form(to_string(p.example))}" end)
-
-    case pairs do
-      [] -> []
-      pairs -> ["", "Example: `GET #{path}?#{Enum.join(pairs, "&")}`"]
+    case ExampleQuery.query_string(params) do
+      "" -> []
+      query -> ["", "Example: `GET #{path}#{query}`"]
     end
   end
 

@@ -65,6 +65,8 @@ defmodule ApiToolkit.InboundLimiter do
   use GenServer
   use Descripex, namespace: "/inbound-limiter"
 
+  alias ApiToolkit.Internal.ChildSpec
+
   defstruct [:table, :window_size_ms, :cleanup_interval_ms]
 
   @type t :: %__MODULE__{
@@ -73,12 +75,12 @@ defmodule ApiToolkit.InboundLimiter do
           cleanup_interval_ms: pos_integer()
         }
 
+  # Client API
+
   @type check_result :: :ok | {:rate_limited, retry_after_ms :: pos_integer()}
   @type key :: term()
 
   @default_cleanup_interval_ms 60_000
-
-  # Client API
 
   @doc """
   Returns a child specification for supervision.
@@ -87,14 +89,7 @@ defmodule ApiToolkit.InboundLimiter do
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
-    name = Keyword.fetch!(opts, :name)
-
-    %{
-      id: name,
-      start: {__MODULE__, :start_link, [opts]},
-      type: :worker,
-      restart: :permanent
-    }
+    ChildSpec.build(__MODULE__, Keyword.fetch!(opts, :name), opts)
   end
 
   @doc """
@@ -190,6 +185,7 @@ defmodule ApiToolkit.InboundLimiter do
       [{^key, count, wid, _prev_count, _prev_wid}] when wid == current_wid - 1 ->
         {:ok, count * (1.0 - elapsed_fraction)}
 
+      # Server callbacks
       _ ->
         :not_found
     end
@@ -208,8 +204,6 @@ defmodule ApiToolkit.InboundLimiter do
     :ets.delete(server, key)
     :ok
   end
-
-  # Server callbacks
 
   @impl true
   def init(opts) do

@@ -39,6 +39,8 @@ defmodule ApiToolkit.Homepage do
   group key. Keys without a label are stringified automatically.
   """
 
+  alias ApiToolkit.Internal.ExampleQuery
+
   @type discovery_module :: module()
 
   @type option ::
@@ -112,15 +114,7 @@ defmodule ApiToolkit.Homepage do
 
   # Builds example query string from GET params that have :example values
   defp example_query(%{method: :get, params: params}) do
-    pairs =
-      params
-      |> Enum.filter(&match?(%{example: val} when val != nil and not is_list(val), &1))
-      |> Enum.map(fn p -> "#{p.name}=#{URI.encode_www_form(to_string(p.example))}" end)
-
-    case pairs do
-      [] -> ""
-      pairs -> "?" <> Enum.join(pairs, "&")
-    end
+    ExampleQuery.query_string(params)
   end
 
   defp example_query(_post), do: ""

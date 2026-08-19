@@ -37,12 +37,13 @@ defmodule ApiToolkit.Rejections do
   use GenServer
   use Descripex, namespace: "/rejections"
 
+  alias ApiToolkit.Internal.ChildSpec
+
+  # --- Public API ---
   @default_name __MODULE__
 
   # Position of the count field in the ETS tuple: {key, count, last_rejected_at}
   @count_pos 2
-
-  # --- Public API ---
 
   @doc """
   Returns a child specification for supervision.
@@ -51,14 +52,7 @@ defmodule ApiToolkit.Rejections do
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
-    name = Keyword.get(opts, :name, @default_name)
-
-    %{
-      id: name,
-      start: {__MODULE__, :start_link, [opts]},
-      type: :worker,
-      restart: :permanent
-    }
+    ChildSpec.build(__MODULE__, Keyword.get(opts, :name, @default_name), opts)
   end
 
   @doc """
@@ -146,6 +140,7 @@ defmodule ApiToolkit.Rejections do
 
   """
   @spec summary(atom()) :: map()
+  # --- GenServer (table owner) ---
   def summary(server \\ @default_name) do
     raw = get_all(server)
 
@@ -169,8 +164,6 @@ defmodule ApiToolkit.Rejections do
     :ets.delete_all_objects(server)
     :ok
   end
-
-  # --- GenServer (table owner) ---
 
   @impl true
   def init(name) do
